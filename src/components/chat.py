@@ -112,7 +112,8 @@ def render_chat(pinecone_service: PineconeService):
 
     # LangChainサービスの初期化
     if "langchain_service" not in st.session_state:
-        st.session_state.langchain_service = LangChainService()
+        from streamlit_app import callback_manager
+        st.session_state.langchain_service = LangChainService(callback_manager=callback_manager)
     
     # プロンプトテンプレートの読み込み（毎回最新の状態を取得）
     prompt_templates, _, _ = load_prompt_templates()

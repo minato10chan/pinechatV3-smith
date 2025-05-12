@@ -16,13 +16,14 @@ from ..config.settings import (
 )
 
 class LangChainService:
-    def __init__(self):
+    def __init__(self, callback_manager=None):
         """LangChainサービスの初期化"""
         # チャットモデルの初期化
         self.llm = ChatOpenAI(
             api_key=OPENAI_API_KEY,
             model_name="gpt-3.5-turbo",
-            temperature=0.7
+            temperature=0.7,
+            callback_manager=callback_manager
         )
         
         # 埋め込みモデルの初期化
