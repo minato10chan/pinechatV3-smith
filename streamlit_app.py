@@ -9,6 +9,15 @@ from src.components.settings import render_settings
 from src.components.agent import render_agent
 from src.components.property_upload import render_property_upload
 from src.config.settings import DEFAULT_SYSTEM_PROMPT, DEFAULT_RESPONSE_TEMPLATE
+import os
+from langsmith import Client
+from langchain.callbacks.tracers import LangChainTracer
+from langchain.callbacks.manager import CallbackManager
+
+# LangSmithの設定
+client = Client()
+tracer = LangChainTracer()
+callback_manager = CallbackManager([tracer])
 
 # セッション状態の初期化
 if "messages" not in st.session_state:
