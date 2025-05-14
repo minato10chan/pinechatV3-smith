@@ -131,29 +131,29 @@ def render_file_upload(pinecone_service: PineconeService):
             
             # 大カテゴリの選択
             main_category = st.selectbox(
-                "大カテゴリ *",
+                "大カテゴリ",
                 METADATA_CATEGORIES["大カテゴリ"],
                 index=None,
-                placeholder="大カテゴリを選択してください"
+                placeholder="大カテゴリを選択してください（任意）"
             )
             
             # 中カテゴリの選択（大カテゴリに依存）
             if main_category:
                 sub_category = st.selectbox(
-                    "中カテゴリ *",
+                    "中カテゴリ",
                     METADATA_CATEGORIES["中カテゴリ"][main_category],
                     index=None,
-                    placeholder="中カテゴリを選択してください"
+                    placeholder="中カテゴリを選択してください（任意）"
                 )
             else:
                 sub_category = None
             
             # 市区町村の選択
             city = st.selectbox(
-                "市区町村 *",
+                "市区町村",
                 METADATA_CATEGORIES["市区町村"],
                 index=None,
-                placeholder="市区町村を選択してください"
+                placeholder="市区町村を選択してください（任意）"
             )
             
             # データ作成日の選択
@@ -173,11 +173,6 @@ def render_file_upload(pinecone_service: PineconeService):
             upload_date = datetime.now()
             
             if st.button("データベースに保存"):
-                # 必須項目のチェック
-                if not all([main_category, sub_category, city]):
-                    st.error("大カテゴリ、中カテゴリ、市区町村は必須項目です。")
-                    return
-                    
                 try:
                     with st.spinner("ファイルを処理中..."):
                         file_content = read_file_content(uploaded_file)
@@ -188,9 +183,9 @@ def render_file_upload(pinecone_service: PineconeService):
                         # メタデータを追加
                         for chunk in chunks:
                             chunk["metadata"] = {
-                                "main_category": main_category,
-                                "sub_category": sub_category,
-                                "city": city,
+                                "main_category": main_category if main_category else None,
+                                "sub_category": sub_category if sub_category else None,
+                                "city": city if city else None,
                                 "created_date": created_date.isoformat() if created_date else None,
                                 "upload_date": upload_date.isoformat(),
                                 "source": source if source else None
