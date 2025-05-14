@@ -69,9 +69,9 @@ def process_csv_file(file):
                 if text.strip():
                     # NaN値を適切に処理し、型変換を確実に行う
                     metadata = {
-                        "main_category": str(row['大カテゴリ']),
-                        "sub_category": str(row['中カテゴリ']),
-                        "facility_name": str(row['施設名']),
+                        "main_category": str(row['大カテゴリ']) if pd.notna(row['大カテゴリ']) else "",
+                        "sub_category": str(row['中カテゴリ']) if pd.notna(row['中カテゴリ']) else "",
+                        "facility_name": str(row['施設名']) if pd.notna(row['施設名']) else "",
                         "latitude": float(row['緯度']) if pd.notna(row['緯度']) else 0.0,
                         "longitude": float(row['経度']) if pd.notna(row['経度']) else 0.0,
                         "walking_distance": int(float(row['徒歩距離'])) if pd.notna(row['徒歩距離']) else 0,

@@ -147,11 +147,11 @@ class PineconeService:
                             "source": chunk.get("metadata", {}).get("source", ""),
                             # CSVファイルのメタデータ
                             "facility_name": chunk.get("metadata", {}).get("facility_name", ""),
-                            "latitude": chunk.get("metadata", {}).get("latitude"),
-                            "longitude": chunk.get("metadata", {}).get("longitude"),
-                            "walking_distance": chunk.get("metadata", {}).get("walking_distance"),
-                            "walking_minutes": chunk.get("metadata", {}).get("walking_minutes"),
-                            "straight_distance": chunk.get("metadata", {}).get("straight_distance")
+                            "latitude": chunk.get("metadata", {}).get("latitude", 0.0),
+                            "longitude": chunk.get("metadata", {}).get("longitude", 0.0),
+                            "walking_distance": chunk.get("metadata", {}).get("walking_distance", 0),
+                            "walking_minutes": chunk.get("metadata", {}).get("walking_minutes", 0),
+                            "straight_distance": chunk.get("metadata", {}).get("straight_distance", 0)
                         }
                         
                         # デバッグ情報の表示
