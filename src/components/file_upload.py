@@ -183,12 +183,12 @@ def render_file_upload(pinecone_service: PineconeService):
                         # メタデータを追加
                         for chunk in chunks:
                             chunk["metadata"] = {
-                                "main_category": main_category if main_category else None,
-                                "sub_category": sub_category if sub_category else None,
-                                "city": city if city else None,
-                                "created_date": created_date.isoformat() if created_date else None,
+                                "main_category": main_category if main_category else "",
+                                "sub_category": sub_category if sub_category else "",
+                                "city": city if city else "",
+                                "created_date": created_date.isoformat() if created_date else "",
                                 "upload_date": upload_date.isoformat(),
-                                "source": source if source else None
+                                "source": source if source else ""
                             }
                             chunk["filename"] = uploaded_file.name
                             chunk["chunk_id"] = chunk["id"]
