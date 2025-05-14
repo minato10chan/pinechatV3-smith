@@ -3,6 +3,7 @@ from src.services.pinecone_service import PineconeService
 import pandas as pd
 import json
 import traceback
+from datetime import datetime
 
 # 都道府県と市区町村のデータ
 PREFECTURES = [
@@ -98,6 +99,7 @@ def render_property_upload(pinecone_service: PineconeService):
                 
                 # Pineconeへのアップロード
                 chunks = [{
+                    "id": f"property_{datetime.now().strftime('%Y%m%d%H%M%S')}",
                     "text": json.dumps(property_data, ensure_ascii=False),
                     "metadata": property_data
                 }]
