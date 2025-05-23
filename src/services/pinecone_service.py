@@ -50,9 +50,10 @@ class PineconeService:
             try:
                 # インデックスの存在確認
                 existing_indexes = self.pc.list_indexes()
+                existing_index_names = [index["name"] for index in existing_indexes]
                 print(f"既存のインデックス: {existing_indexes}")
                 
-                if PINECONE_INDEX_NAME not in existing_indexes:
+                if PINECONE_INDEX_NAME not in existing_index_names:
                     print(f"インデックス '{PINECONE_INDEX_NAME}' が存在しないため、新規作成します")
                     try:
                         # インデックスが存在しない場合は作成
@@ -75,6 +76,8 @@ class PineconeService:
                             print(f"インデックス '{PINECONE_INDEX_NAME}' は既に存在します")
                         else:
                             raise create_error
+                else:
+                    print(f"インデックス '{PINECONE_INDEX_NAME}' は既に存在します")
                 
                 # インデックスの取得
                 self.index = self.pc.Index(PINECONE_INDEX_NAME)
