@@ -58,7 +58,13 @@ class PineconeService:
                     self.pc.create_index(
                         name=PINECONE_INDEX_NAME,
                         dimension=1536,  # OpenAIの埋め込みモデルの次元数
-                        metric="cosine"
+                        metric="cosine",
+                        spec={
+                            "serverless": {
+                                "cloud": "aws",
+                                "region": "us-east-1"
+                            }
+                        }
                     )
                     print(f"インデックス '{PINECONE_INDEX_NAME}' の作成を開始しました")
                     # インデックスの作成完了を待機
