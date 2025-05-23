@@ -54,21 +54,27 @@ class PineconeService:
                 
                 if PINECONE_INDEX_NAME not in existing_indexes:
                     print(f"インデックス '{PINECONE_INDEX_NAME}' が存在しないため、新規作成します")
-                    # インデックスが存在しない場合は作成
-                    self.pc.create_index(
-                        name=PINECONE_INDEX_NAME,
-                        dimension=1536,  # OpenAIの埋め込みモデルの次元数
-                        metric="cosine",
-                        spec={
-                            "serverless": {
-                                "cloud": "aws",
-                                "region": "us-east-1"
+                    try:
+                        # インデックスが存在しない場合は作成
+                        self.pc.create_index(
+                            name=PINECONE_INDEX_NAME,
+                            dimension=1536,  # OpenAIの埋め込みモデルの次元数
+                            metric="cosine",
+                            spec={
+                                "serverless": {
+                                    "cloud": "aws",
+                                    "region": "us-east-1"
+                                }
                             }
-                        }
-                    )
-                    print(f"インデックス '{PINECONE_INDEX_NAME}' の作成を開始しました")
-                    # インデックスの作成完了を待機
-                    time.sleep(10)
+                        )
+                        print(f"インデックス '{PINECONE_INDEX_NAME}' の作成を開始しました")
+                        # インデックスの作成完了を待機
+                        time.sleep(10)
+                    except Exception as create_error:
+                        if "ALREADY_EXISTS" in str(create_error):
+                            print(f"インデックス '{PINECONE_INDEX_NAME}' は既に存在します")
+                        else:
+                            raise create_error
                 
                 # インデックスの取得
                 self.index = self.pc.Index(PINECONE_INDEX_NAME)
