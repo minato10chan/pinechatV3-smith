@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from pinecone import Pinecone, ServerlessSpec
+from pinecone import Pinecone
 from openai import OpenAI
 import time
 from ..config.settings import (
@@ -49,21 +49,16 @@ class PineconeService:
         for attempt in range(max_retries):
             try:
                 # インデックスの存在確認
-                existing_indexes = self.pc.list_indexes().names()
+                existing_indexes = self.pc.list_indexes()
                 print(f"既存のインデックス: {existing_indexes}")
                 
                 if PINECONE_INDEX_NAME not in existing_indexes:
                     print(f"インデックス '{PINECONE_INDEX_NAME}' が存在しないため、新規作成します")
                     # インデックスが存在しない場合は作成
-                    spec = ServerlessSpec(
-                        cloud="aws",
-                        region="us-east-1"
-                    )
                     self.pc.create_index(
                         name=PINECONE_INDEX_NAME,
                         dimension=1536,  # OpenAIの埋め込みモデルの次元数
-                        metric="cosine",
-                        spec=spec
+                        metric="cosine"
                     )
                     print(f"インデックス '{PINECONE_INDEX_NAME}' の作成を開始しました")
                     # インデックスの作成完了を待機
@@ -261,7 +256,7 @@ class PineconeService:
         
         for attempt in range(max_retries):
             try:
-                stats = self.index.describe_index_stats(namespace=namespace)
+                stats = self.index.describe_index_stats()
                 return {
                     "total_vector_count": stats.total_vector_count,
                     "namespaces": stats.namespaces
@@ -297,7 +292,7 @@ class PineconeService:
             data = []
             for match in results.matches:
                 if 'metadata' in match:
-                    metadata = match['metadata']
+                    metadata = match.metadata
                     # 必要なメタデータを抽出
                     item = {
                         'filename': metadata.get('filename', ''),
@@ -320,7 +315,7 @@ class PineconeService:
         try:
             stats = self.index.describe_index_stats()
             if namespace:
-                return stats.get('namespaces', {}).get(namespace, {})
+                return stats.namespaces.get(namespace, {})
             return stats
         except Exception as e:
             raise Exception(f"統計情報の取得に失敗しました: {str(e)}")
