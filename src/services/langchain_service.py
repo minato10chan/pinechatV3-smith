@@ -83,11 +83,18 @@ class LangChainService:
                 print("🚨 Critical: Remaining quota is less than $0.1")
                 
         except Exception as e:
-            print(f"\n❌ Error checking API usage: {str(e)}")
-            if "insufficient_quota" in str(e):
+            error_message = str(e)
+            print(f"\n❌ Error checking API usage: {error_message}")
+            
+            if "insufficient_quota" in error_message:
                 print("\n🚨 Critical: API quota has been exceeded!")
                 print("Please check your OpenAI API key and billing settings.")
                 print("You can check your usage and quota at: https://platform.openai.com/account/usage")
+            elif "object has no attribute" in error_message:
+                print("\n⚠️ Warning: Unable to check API usage. This might be due to API changes or permissions.")
+                print("Please check your OpenAI API key and ensure it has the necessary permissions.")
+            else:
+                print("\n⚠️ Warning: Unable to check API usage. Please verify your API key and permissions.")
 
     def count_tokens(self, text: str) -> int:
         """テキストのトークン数をカウント"""
@@ -95,72 +102,94 @@ class LangChainService:
 
     def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K) -> Tuple[str, List[Dict[str, Any]]]:
         """クエリに関連する文脈を取得"""
-        # クエリのトークン数をカウント
-        query_tokens = self.count_tokens(query)
-        print(f"クエリのトークン数: {query_tokens}")
-        
-        # クエリのベクトル化
-        query_vector = self.embeddings.embed_query(query)
-        
-        # より多くの結果を取得して、後でフィルタリング
-        docs = self.vectorstore.similarity_search_with_score(query, k=top_k * 2)
-        
-        # メタデータも検索対象に含める
-        for doc in docs:
-            # メタデータの各フィールドを検索対象に追加
-            metadata_text = []
-            for key, value in doc[0].metadata.items():
-                if isinstance(value, str):
-                    # メタデータの値をテキストに追加
-                    metadata_text.append(f"{key}: {value}")
+        try:
+            # クエリのトークン数をカウント
+            query_tokens = self.count_tokens(query)
+            print(f"クエリのトークン数: {query_tokens}")
             
-            # メタデータをテキストの前に追加
-            if metadata_text:
-                doc[0].page_content = "\n".join(metadata_text) + "\n\n" + doc[0].page_content
-        
-        # スコアでフィルタリング
-        filtered_docs = [
-            doc for doc in docs 
-            if doc[1] >= SIMILARITY_THRESHOLD
-        ][:top_k]  # 上位K件に制限
-        
-        # フィルタリング後の結果が0件の場合は、スコアに関係なく上位K件を使用
-        if not filtered_docs and docs:
-            filtered_docs = docs[:top_k]
-        
-        context_text = "\n".join([doc[0].page_content for doc in filtered_docs])
-        
-        # コンテキストのトークン数をカウント
-        context_tokens = self.count_tokens(context_text)
-        print(f"コンテキストのトークン数: {context_tokens}")
-        
-        search_details = [
-            {
-                "スコア": round(doc[1], 4),  # 類似度スコアを小数点4桁まで表示
-                "テキスト": doc[0].page_content[:100] + "...",  # テキストの一部を表示
-                "メタデータ": doc[0].metadata,  # メタデータを追加
-                "類似度判断": {
-                    "閾値": SIMILARITY_THRESHOLD,
-                    "閾値以上": doc[1] >= SIMILARITY_THRESHOLD,
-                    "スコア詳細": f"スコア {round(doc[1], 4)} は閾値 {SIMILARITY_THRESHOLD} に対して {'以上' if doc[1] >= SIMILARITY_THRESHOLD else '未満'}",
-                    "理解過程": {
-                        "クエリ": query,
-                        "テキスト": doc[0].page_content,
-                        "類似度計算": {
-                            "スコア": round(doc[1], 4)
+            # クエリのベクトル化
+            query_vector = self.embeddings.embed_query(query)
+            
+            # より多くの結果を取得して、後でフィルタリング
+            docs = self.vectorstore.similarity_search_with_score(query, k=top_k * 2)
+            
+            # メタデータも検索対象に含める
+            for doc in docs:
+                # メタデータの各フィールドを検索対象に追加
+                metadata_text = []
+                for key, value in doc[0].metadata.items():
+                    if isinstance(value, str):
+                        # メタデータの値をテキストに追加
+                        metadata_text.append(f"{key}: {value}")
+                
+                # メタデータをテキストの前に追加
+                if metadata_text:
+                    doc[0].page_content = "\n".join(metadata_text) + "\n\n" + doc[0].page_content
+            
+            # スコアでフィルタリング
+            filtered_docs = [
+                doc for doc in docs 
+                if doc[1] >= SIMILARITY_THRESHOLD
+            ][:top_k]  # 上位K件に制限
+            
+            # フィルタリング後の結果が0件の場合は、スコアに関係なく上位K件を使用
+            if not filtered_docs and docs:
+                filtered_docs = docs[:top_k]
+            
+            context_text = "\n".join([doc[0].page_content for doc in filtered_docs])
+            
+            # コンテキストのトークン数をカウント
+            context_tokens = self.count_tokens(context_text)
+            print(f"コンテキストのトークン数: {context_tokens}")
+            
+            search_details = [
+                {
+                    "スコア": round(doc[1], 4),  # 類似度スコアを小数点4桁まで表示
+                    "テキスト": doc[0].page_content[:100] + "...",  # テキストの一部を表示
+                    "メタデータ": doc[0].metadata,  # メタデータを追加
+                    "類似度判断": {
+                        "閾値": SIMILARITY_THRESHOLD,
+                        "閾値以上": doc[1] >= SIMILARITY_THRESHOLD,
+                        "スコア詳細": f"スコア {round(doc[1], 4)} は閾値 {SIMILARITY_THRESHOLD} に対して {'以上' if doc[1] >= SIMILARITY_THRESHOLD else '未満'}",
+                        "理解過程": {
+                            "クエリ": query,
+                            "テキスト": doc[0].page_content,
+                            "類似度計算": {
+                                "スコア": round(doc[1], 4)
+                            }
                         }
                     }
                 }
-            }
-            for doc in filtered_docs
-        ]
-        
-        print(f"検索クエリ: {query}")  # デバッグ用
-        print(f"検索結果数: {len(filtered_docs)}")  # デバッグ用
-        for detail in search_details:
-            print(f"スコア: {detail['スコア']}, テキスト: {detail['テキスト']}")  # デバッグ用
-        
-        return context_text, search_details
+                for doc in filtered_docs
+            ]
+            
+            print(f"検索クエリ: {query}")  # デバッグ用
+            print(f"検索結果数: {len(filtered_docs)}")  # デバッグ用
+            for detail in search_details:
+                print(f"スコア: {detail['スコア']}, テキスト: {detail['テキスト']}")  # デバッグ用
+            
+            return context_text, search_details
+            
+        except Exception as e:
+            error_message = str(e)
+            if "insufficient_quota" in error_message:
+                print("\n🚨 Critical: API quota has been exceeded!")
+                print("Please check your OpenAI API key and billing settings.")
+                print("You can check your usage and quota at: https://platform.openai.com/account/usage")
+                # 空のコンテキストとエラー詳細を返す
+                return "", [{
+                    "エラー": True,
+                    "エラーメッセージ": "API quota has been exceeded",
+                    "エラータイプ": "API Quota Error",
+                    "推奨アクション": "Please update your API key in Streamlit Cloud settings"
+                }]
+            else:
+                print(f"\n❌ Error in get_relevant_context: {error_message}")
+                return "", [{
+                    "エラー": True,
+                    "エラーメッセージ": error_message,
+                    "エラータイプ": "Unknown Error"
+                }]
 
     def get_response(self, query: str, system_prompt: str = None, response_template: str = None, property_info: str = None, chat_history: list = None) -> Tuple[str, Dict[str, Any]]:
         """クエリに対する応答を生成"""
