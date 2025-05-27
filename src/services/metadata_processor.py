@@ -15,7 +15,7 @@ class MetadataField:
     required: bool = False
 
 class MetadataProcessor:
-    def __init__(self, model_name: str = "gpt-3.5-turbo"):
+    def __init__(self, model_name: str = "gpt4-mini"):
         if not OPENAI_API_KEY:
             raise ValueError("OPENAI_API_KEY is not set in settings")
         
