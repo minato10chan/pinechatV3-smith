@@ -26,7 +26,7 @@ class LangChainService:
         # チャットモデルの初期化
         self.llm = ChatOpenAI(
             api_key=OPENAI_API_KEY,
-            model_name="gpt4-mini",
+            model_name="gpt4o-mini",
             temperature=0.7,
             callback_manager=callback_manager
         )
