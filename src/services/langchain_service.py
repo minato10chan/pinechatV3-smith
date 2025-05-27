@@ -27,7 +27,7 @@ class LangChainService:
         self.llm = ChatOpenAI(
             api_key=OPENAI_API_KEY,
             model_name="gpt4o-mini",
-            temperature=0.7,
+            temperature=0.85,
             callback_manager=callback_manager
         )
         
