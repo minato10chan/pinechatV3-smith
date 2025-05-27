@@ -5,6 +5,7 @@ from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import HumanMessage, AIMessage
 import os
+import tiktoken
 from ..config.settings import (
     PINECONE_API_KEY,
     PINECONE_INDEX_NAME,
@@ -32,6 +33,9 @@ class LangChainService:
             model="text-embedding-ada-002"
         )
         
+        # トークンカウンターの初期化
+        self.encoding = tiktoken.encoding_for_model("gpt-4")
+        
         # PineconeのAPIキーを環境変数に設定
         os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
         
@@ -48,8 +52,16 @@ class LangChainService:
         self.system_prompt = DEFAULT_SYSTEM_PROMPT
         self.response_template = DEFAULT_RESPONSE_TEMPLATE
 
+    def count_tokens(self, text: str) -> int:
+        """テキストのトークン数をカウント"""
+        return len(self.encoding.encode(text))
+
     def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K) -> Tuple[str, List[Dict[str, Any]]]:
         """クエリに関連する文脈を取得"""
+        # クエリのトークン数をカウント
+        query_tokens = self.count_tokens(query)
+        print(f"クエリのトークン数: {query_tokens}")
+        
         # クエリのベクトル化
         query_vector = self.embeddings.embed_query(query)
         
@@ -80,6 +92,11 @@ class LangChainService:
             filtered_docs = docs[:top_k]
         
         context_text = "\n".join([doc[0].page_content for doc in filtered_docs])
+        
+        # コンテキストのトークン数をカウント
+        context_tokens = self.count_tokens(context_text)
+        print(f"コンテキストのトークン数: {context_tokens}")
+        
         search_details = [
             {
                 "スコア": round(doc[1], 4),  # 類似度スコアを小数点4桁まで表示
@@ -146,6 +163,14 @@ class LangChainService:
                 elif role == "ai":
                     self.message_history.add_ai_message(content)
         
+        # プロンプトのトークン数をカウント
+        prompt_tokens = self.count_tokens(system_prompt)
+        print(f"システムプロンプトのトークン数: {prompt_tokens}")
+        
+        # チャット履歴のトークン数をカウント
+        history_tokens = sum(self.count_tokens(msg.content) for msg in self.message_history.messages)
+        print(f"チャット履歴のトークン数: {history_tokens}")
+        
         # 応答を生成
         response = chain.invoke({
             "chat_history": self.message_history.messages,
@@ -154,14 +179,26 @@ class LangChainService:
             "input": query
         })
         
+        # 応答のトークン数をカウント
+        response_tokens = self.count_tokens(response.content)
+        print(f"応答のトークン数: {response_tokens}")
+        
         # メッセージを履歴に追加
         self.message_history.add_user_message(query)
         self.message_history.add_ai_message(response.content)
         
         # 詳細情報の作成
         details = {
-            "モデル": "GPT-3.5-turbo",
+            "モデル": "GPT4-mini",
             "会話履歴": "有効",
+            "トークン数": {
+                "クエリ": self.count_tokens(query),
+                "システムプロンプト": prompt_tokens,
+                "チャット履歴": history_tokens,
+                "コンテキスト": self.count_tokens(context),
+                "応答": response_tokens,
+                "合計": prompt_tokens + history_tokens + self.count_tokens(context) + response_tokens
+            },
             "文脈検索": {
                 "検索結果数": len(search_details),
                 "マッチしたチャンク": search_details
