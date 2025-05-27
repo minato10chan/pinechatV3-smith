@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from pinecone import Pinecone, ServerlessSpec
+from pinecone import Pinecone
 from openai import OpenAI
 import time
 from ..config.settings import (
@@ -61,10 +61,12 @@ class PineconeService:
                             name=PINECONE_INDEX_NAME,
                             dimension=1536,  # OpenAIの埋め込みモデルの次元数
                             metric="cosine",
-                            spec=ServerlessSpec(
-                                cloud="aws",
-                                region="us-east-1"
-                            )
+                            spec={
+                                "serverless": {
+                                    "cloud": "aws",
+                                    "region": "us-east-1"
+                                }
+                            }
                         )
                         print(f"インデックス '{PINECONE_INDEX_NAME}' の作成を開始しました")
                         # インデックスの作成完了を待機
