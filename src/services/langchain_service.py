@@ -6,6 +6,7 @@ from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import HumanMessage, AIMessage
 import os
 import tiktoken
+from openai import OpenAI
 from ..config.settings import (
     PINECONE_API_KEY,
     PINECONE_INDEX_NAME,
@@ -19,6 +20,9 @@ from ..config.settings import (
 class LangChainService:
     def __init__(self, callback_manager=None):
         """LangChainサービスの初期化"""
+        # OpenAIクライアントの初期化
+        self.openai_client = OpenAI(api_key=OPENAI_API_KEY)
+        
         # チャットモデルの初期化
         self.llm = ChatOpenAI(
             api_key=OPENAI_API_KEY,
@@ -51,6 +55,35 @@ class LangChainService:
         # デフォルトのプロンプトテンプレート
         self.system_prompt = DEFAULT_SYSTEM_PROMPT
         self.response_template = DEFAULT_RESPONSE_TEMPLATE
+
+    def check_api_usage(self):
+        """OpenAI APIの使用状況を確認"""
+        try:
+            # 使用状況の取得
+            usage = self.openai_client.usage.retrieve()
+            
+            # 使用状況の表示
+            print("\n=== OpenAI API Usage ===")
+            print(f"Total Tokens: {usage.total_tokens}")
+            print(f"Total Cost: ${usage.total_cost:.4f}")
+            print(f"Usage Period: {usage.period}")
+            
+            # クォータ情報の取得
+            quota = self.openai_client.quota.retrieve()
+            print("\n=== OpenAI API Quota ===")
+            print(f"Total Quota: ${quota.total_quota:.2f}")
+            print(f"Used Quota: ${quota.used_quota:.2f}")
+            print(f"Remaining Quota: ${quota.remaining_quota:.2f}")
+            print(f"Quota Period: {quota.period}")
+            
+            # 警告メッセージ
+            if quota.remaining_quota < 1.0:
+                print("\n⚠️ Warning: Remaining quota is less than $1.0")
+            if quota.remaining_quota < 0.1:
+                print("🚨 Critical: Remaining quota is less than $0.1")
+                
+        except Exception as e:
+            print(f"\n❌ Error checking API usage: {str(e)}")
 
     def count_tokens(self, text: str) -> int:
         """テキストのトークン数をカウント"""
