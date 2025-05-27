@@ -60,7 +60,7 @@ class LangChainService:
         """OpenAI APIの使用状況を確認"""
         try:
             # 使用状況の取得
-            usage = self.openai_client.billing.usage()
+            usage = self.openai_client.usage.retrieve()
             
             # 使用状況の表示
             print("\n=== OpenAI API Usage ===")
@@ -69,7 +69,7 @@ class LangChainService:
             print(f"Usage Period: {usage.period}")
             
             # クォータ情報の取得
-            quota = self.openai_client.billing.quota()
+            quota = self.openai_client.quota.retrieve()
             print("\n=== OpenAI API Quota ===")
             print(f"Total Quota: ${quota.total_quota:.2f}")
             print(f"Used Quota: ${quota.used_quota:.2f}")
@@ -127,10 +127,12 @@ class LangChainService:
                     doc[0].page_content = "\n".join(metadata_text) + "\n\n" + doc[0].page_content
             
             # スコアでフィルタリング
-            filtered_docs = [
-                doc for doc in docs 
-                if doc[1] >= SIMILARITY_THRESHOLD
-            ][:top_k]  # 上位K件に制限
+            filtered_docs = []
+            for doc in docs:
+                if doc[1] >= SIMILARITY_THRESHOLD:
+                    filtered_docs.append(doc)
+                    if len(filtered_docs) >= top_k:
+                        break
             
             # フィルタリング後の結果が0件の場合は、スコアに関係なく上位K件を使用
             if not filtered_docs and docs:
@@ -142,8 +144,9 @@ class LangChainService:
             context_tokens = self.count_tokens(context_text)
             print(f"コンテキストのトークン数: {context_tokens}")
             
-            search_details = [
-                {
+            search_details = []
+            for doc in filtered_docs:
+                detail = {
                     "スコア": round(doc[1], 4),  # 類似度スコアを小数点4桁まで表示
                     "テキスト": doc[0].page_content[:100] + "...",  # テキストの一部を表示
                     "メタデータ": doc[0].metadata,  # メタデータを追加
@@ -160,8 +163,7 @@ class LangChainService:
                         }
                     }
                 }
-                for doc in filtered_docs
-            ]
+                search_details.append(detail)
             
             print(f"検索クエリ: {query}")  # デバッグ用
             print(f"検索結果数: {len(filtered_docs)}")  # デバッグ用
