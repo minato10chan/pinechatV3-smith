@@ -1,5 +1,5 @@
 from typing import List, Dict, Any
-from pinecone import Pinecone
+from pinecone import Pinecone, ServerlessSpec
 from openai import OpenAI
 import time
 from ..config.settings import (
@@ -61,12 +61,10 @@ class PineconeService:
                             name=PINECONE_INDEX_NAME,
                             dimension=1536,  # OpenAIの埋め込みモデルの次元数
                             metric="cosine",
-                            spec={
-                                "serverless": {
-                                    "cloud": "aws",
-                                    "region": "us-east-1"
-                                }
-                            }
+                            spec=ServerlessSpec(
+                                cloud="aws",
+                                region="us-east-1"
+                            )
                         )
                         print(f"インデックス '{PINECONE_INDEX_NAME}' の作成を開始しました")
                         # インデックスの作成完了を待機
@@ -81,20 +79,14 @@ class PineconeService:
                 
                 # インデックスの取得
                 self.index = self.pc.Index(PINECONE_INDEX_NAME)
-                print(f"インデックス '{PINECONE_INDEX_NAME}' に接続しました")
-                
-                # インデックスの状態を確認
-                stats = self.index.describe_index_stats()
-                print(f"インデックスの状態: {stats.total_vector_count}件のベクトル")
-                
-                return
+                break
                 
             except Exception as e:
                 if attempt < max_retries - 1:
                     print(f"インデックスの初期化に失敗しました（試行 {attempt + 1}/{max_retries}）: {str(e)}")
                     print(f"{retry_delay}秒後に再試行します...")
                     time.sleep(retry_delay)
-                    retry_delay *= 2  # 待機時間を倍増
+                    retry_delay *= 2
                 else:
                     raise Exception(f"インデックスの初期化に失敗しました（最大試行回数到達）: {str(e)}")
 
