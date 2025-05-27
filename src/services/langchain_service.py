@@ -258,7 +258,7 @@ class LangChainService:
             
             # 詳細情報の作成
             details = {
-                "モデル": "GPT4-mini",
+                "モデル": "GPT-4o-mini",
                 "会話履歴": "有効",
                 "トークン数": {
                     "クエリ": self.count_tokens(query),
