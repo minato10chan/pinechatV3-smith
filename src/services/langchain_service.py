@@ -60,7 +60,7 @@ class LangChainService:
         """OpenAI APIの使用状況を確認"""
         try:
             # 使用状況の取得
-            usage = self.openai_client.usage.retrieve()
+            usage = self.openai_client.billing.usage()
             
             # 使用状況の表示
             print("\n=== OpenAI API Usage ===")
@@ -69,7 +69,7 @@ class LangChainService:
             print(f"Usage Period: {usage.period}")
             
             # クォータ情報の取得
-            quota = self.openai_client.quota.retrieve()
+            quota = self.openai_client.billing.quota()
             print("\n=== OpenAI API Quota ===")
             print(f"Total Quota: ${quota.total_quota:.2f}")
             print(f"Used Quota: ${quota.used_quota:.2f}")
@@ -84,6 +84,10 @@ class LangChainService:
                 
         except Exception as e:
             print(f"\n❌ Error checking API usage: {str(e)}")
+            if "insufficient_quota" in str(e):
+                print("\n🚨 Critical: API quota has been exceeded!")
+                print("Please check your OpenAI API key and billing settings.")
+                print("You can check your usage and quota at: https://platform.openai.com/account/usage")
 
     def count_tokens(self, text: str) -> int:
         """テキストのトークン数をカウント"""
@@ -160,91 +164,113 @@ class LangChainService:
 
     def get_response(self, query: str, system_prompt: str = None, response_template: str = None, property_info: str = None, chat_history: list = None) -> Tuple[str, Dict[str, Any]]:
         """クエリに対する応答を生成"""
-        # プロンプトの設定
-        system_prompt = system_prompt or self.system_prompt
-        response_template = response_template or self.response_template
-        
-        # メッセージリストの作成
-        messages = [
-            ("system", system_prompt),
-            MessagesPlaceholder(variable_name="chat_history"),
-            ("system", "参照文脈:\n{context}")
-        ]
-        
-        # 物件情報がある場合は追加
-        if property_info:
-            messages.append(("system", "物件情報:\n{property_info}"))
-        
-        # ユーザー入力の追加
-        messages.append(("human", "{input}"))
-        
-        # プロンプトテンプレートの設定
-        prompt = ChatPromptTemplate.from_messages(messages)
-        
-        # チェーンの初期化
-        chain = prompt | self.llm
-        
-        # 関連する文脈を取得
-        context, search_details = self.get_relevant_context(query)
-        
-        # チャット履歴を設定
-        if chat_history:
-            self.message_history.messages = []
-            for role, content in chat_history:
-                if role == "human":
-                    self.message_history.add_user_message(content)
-                elif role == "ai":
-                    self.message_history.add_ai_message(content)
-        
-        # プロンプトのトークン数をカウント
-        prompt_tokens = self.count_tokens(system_prompt)
-        print(f"システムプロンプトのトークン数: {prompt_tokens}")
-        
-        # チャット履歴のトークン数をカウント
-        history_tokens = sum(self.count_tokens(msg.content) for msg in self.message_history.messages)
-        print(f"チャット履歴のトークン数: {history_tokens}")
-        
-        # 応答を生成
-        response = chain.invoke({
-            "chat_history": self.message_history.messages,
-            "context": context,
-            "property_info": property_info or "物件情報はありません。",
-            "input": query
-        })
-        
-        # 応答のトークン数をカウント
-        response_tokens = self.count_tokens(response.content)
-        print(f"応答のトークン数: {response_tokens}")
-        
-        # メッセージを履歴に追加
-        self.message_history.add_user_message(query)
-        self.message_history.add_ai_message(response.content)
-        
-        # 詳細情報の作成
-        details = {
-            "モデル": "GPT4-mini",
-            "会話履歴": "有効",
-            "トークン数": {
-                "クエリ": self.count_tokens(query),
-                "システムプロンプト": prompt_tokens,
-                "チャット履歴": history_tokens,
-                "コンテキスト": self.count_tokens(context),
-                "応答": response_tokens,
-                "合計": prompt_tokens + history_tokens + self.count_tokens(context) + response_tokens
-            },
-            "文脈検索": {
-                "検索結果数": len(search_details),
-                "マッチしたチャンク": search_details
-            },
-            "プロンプト": {
-                "システムプロンプト": system_prompt,
-                "応答テンプレート": response_template
-            },
-            "物件情報": property_info or "物件情報はありません。",
-            "会話履歴数": len(chat_history) if chat_history else 0
-        }
-        
-        return response.content, details
+        try:
+            # プロンプトの設定
+            system_prompt = system_prompt or self.system_prompt
+            response_template = response_template or self.response_template
+            
+            # メッセージリストの作成
+            messages = [
+                ("system", system_prompt),
+                MessagesPlaceholder(variable_name="chat_history"),
+                ("system", "参照文脈:\n{context}")
+            ]
+            
+            # 物件情報がある場合は追加
+            if property_info:
+                messages.append(("system", "物件情報:\n{property_info}"))
+            
+            # ユーザー入力の追加
+            messages.append(("human", "{input}"))
+            
+            # プロンプトテンプレートの設定
+            prompt = ChatPromptTemplate.from_messages(messages)
+            
+            # チェーンの初期化
+            chain = prompt | self.llm
+            
+            # 関連する文脈を取得
+            context, search_details = self.get_relevant_context(query)
+            
+            # チャット履歴を設定
+            if chat_history:
+                self.message_history.messages = []
+                for role, content in chat_history:
+                    if role == "human":
+                        self.message_history.add_user_message(content)
+                    elif role == "ai":
+                        self.message_history.add_ai_message(content)
+            
+            # プロンプトのトークン数をカウント
+            prompt_tokens = self.count_tokens(system_prompt)
+            print(f"システムプロンプトのトークン数: {prompt_tokens}")
+            
+            # チャット履歴のトークン数をカウント
+            history_tokens = sum(self.count_tokens(msg.content) for msg in self.message_history.messages)
+            print(f"チャット履歴のトークン数: {history_tokens}")
+            
+            # 応答を生成
+            response = chain.invoke({
+                "chat_history": self.message_history.messages,
+                "context": context,
+                "property_info": property_info or "物件情報はありません。",
+                "input": query
+            })
+            
+            # 応答のトークン数をカウント
+            response_tokens = self.count_tokens(response.content)
+            print(f"応答のトークン数: {response_tokens}")
+            
+            # メッセージを履歴に追加
+            self.message_history.add_user_message(query)
+            self.message_history.add_ai_message(response.content)
+            
+            # 詳細情報の作成
+            details = {
+                "モデル": "GPT4-mini",
+                "会話履歴": "有効",
+                "トークン数": {
+                    "クエリ": self.count_tokens(query),
+                    "システムプロンプト": prompt_tokens,
+                    "チャット履歴": history_tokens,
+                    "コンテキスト": self.count_tokens(context),
+                    "応答": response_tokens,
+                    "合計": prompt_tokens + history_tokens + self.count_tokens(context) + response_tokens
+                },
+                "文脈検索": {
+                    "検索結果数": len(search_details),
+                    "マッチしたチャンク": search_details
+                },
+                "プロンプト": {
+                    "システムプロンプト": system_prompt,
+                    "応答テンプレート": response_template
+                },
+                "物件情報": property_info or "物件情報はありません。",
+                "会話履歴数": len(chat_history) if chat_history else 0
+            }
+            
+            return response.content, details
+            
+        except Exception as e:
+            error_message = str(e)
+            if "insufficient_quota" in error_message:
+                error_response = "申し訳ありません。APIの利用制限に達しました。\n\n" + \
+                               "以下の手順で対応をお願いします：\n" + \
+                               "1. OpenAIのアカウント設定を確認してください\n" + \
+                               "2. 新しいAPIキーを取得してください\n" + \
+                               "3. Streamlit Cloudの設定で新しいAPIキーを更新してください\n\n" + \
+                               "詳細はこちらで確認できます：\n" + \
+                               "https://platform.openai.com/account/usage"
+            else:
+                error_response = f"エラーが発生しました：{error_message}"
+            
+            error_details = {
+                "エラー": True,
+                "エラーメッセージ": error_message,
+                "エラータイプ": "API Quota Error" if "insufficient_quota" in error_message else "Unknown Error"
+            }
+            
+            return error_response, error_details
 
     def clear_memory(self):
         """会話メモリをクリア"""
