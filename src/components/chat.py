@@ -241,40 +241,40 @@ def render_chat(pinecone_service: PineconeService):
                 if st.button("詳細情報を表示", key=f"details_{message['timestamp']}"):
                     # トークン数情報の表示
                     if "トークン数" in message["details"]:
-                        st.subheader("トークン数")
+                        st.write("### トークン数")
                         st.json(message["details"]["トークン数"])
                     
                     # 送信テキストの表示
                     if "送信テキスト" in message["details"]:
-                        st.subheader("送信テキスト")
+                        st.write("### 送信テキスト")
                         sent_text = message["details"]["送信テキスト"]
                         
                         # システムプロンプト
-                        st.subheader("システムプロンプト")
+                        st.write("#### システムプロンプト")
                         st.text(sent_text["システムプロンプト"])
                         
                         # チャット履歴
-                        st.subheader("チャット履歴")
+                        st.write("#### チャット履歴")
                         for msg in sent_text["チャット履歴"]:
                             st.text(f"[{msg['type']}]: {msg['content']}")
                         
                         # 参照文脈
-                        st.subheader("参照文脈")
+                        st.write("#### 参照文脈")
                         st.text(sent_text["参照文脈"])
                         
                         # 物件情報
-                        st.subheader("物件情報")
+                        st.write("#### 物件情報")
                         st.text(sent_text["物件情報"])
                         
                         # ユーザー入力
-                        st.subheader("ユーザー入力")
+                        st.write("#### ユーザー入力")
                         st.text(sent_text["ユーザー入力"])
                     
                     # その他の詳細情報
                     other_details = {k: v for k, v in message["details"].items() 
                                   if k not in ["トークン数", "送信テキスト"]}
                     if other_details:
-                        st.subheader("その他の情報")
+                        st.write("### その他の情報")
                         st.json(other_details)
 
     # ユーザー入力
