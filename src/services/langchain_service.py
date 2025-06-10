@@ -26,8 +26,7 @@ class LangChainService:
         # チャットモデルの初期化
         self.llm = ChatOpenAI(
             api_key=OPENAI_API_KEY,
-             # model_name="gpt-4o-mini",
-            model_name="gpt-3.5-turbo",
+            model_name="gpt-4o-mini",
             temperature=0.85,
             callback_manager=callback_manager
         )
@@ -270,7 +269,7 @@ class LangChainService:
             
             # 詳細情報の作成
             details = {
-                "モデル": "gpt-3.5-turbo",
+                "モデル": "gpt-4o-mini",
                 "会話履歴": "有効",
                 "トークン数": {
                     "クエリ": self.count_tokens(query),
