@@ -236,7 +236,35 @@ def render_chat(pinecone_service: PineconeService):
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
-            # 詳細情報の表示機能を削除
+            if "details" in message and message["details"]:
+                # 詳細情報を表示するボタン
+                if st.button("詳細情報を表示", key=f"details_{message['timestamp']}"):
+                    details = message["details"]
+                    
+                    # タブを使用して詳細情報を表示
+                    tabs = st.tabs(["トークン数", "送信テキスト", "その他の情報"])
+                    
+                    # トークン数タブ
+                    with tabs[0]:
+                        if "トークン数" in details:
+                            st.json(details["トークン数"])
+                    
+                    # 送信テキストタブ
+                    with tabs[1]:
+                        if "送信テキスト" in details:
+                            sent_text = details["送信テキスト"]
+                            st.text_area("システムプロンプト", sent_text["システムプロンプト"], height=100)
+                            st.text_area("チャット履歴", "\n".join([f"[{msg['type']}]: {msg['content']}" for msg in sent_text["チャット履歴"]]), height=200)
+                            st.text_area("参照文脈", sent_text["参照文脈"], height=100)
+                            st.text_area("物件情報", sent_text["物件情報"], height=100)
+                            st.text_area("ユーザー入力", sent_text["ユーザー入力"], height=100)
+                    
+                    # その他の情報タブ
+                    with tabs[2]:
+                        other_details = {k: v for k, v in details.items() 
+                                      if k not in ["トークン数", "送信テキスト"]}
+                        if other_details:
+                            st.json(other_details)
 
     # ユーザー入力
     if prompt := st.chat_input("メッセージを入力してください"):
