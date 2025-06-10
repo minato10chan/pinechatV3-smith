@@ -61,27 +61,27 @@ class LangChainService:
         """OpenAI APIの使用状況を確認"""
         try:
             # 使用状況の取得
-            usage = self.openai_client.usage.retrieve()
+            # usage = self.openai_client.usage.retrieve()
             
             # 使用状況の表示
             print("\n=== OpenAI API Usage ===")
-            print(f"Total Tokens: {usage.total_tokens}")
-            print(f"Total Cost: ${usage.total_cost:.4f}")
-            print(f"Usage Period: {usage.period}")
+            # print(f"Total Tokens: {usage.total_tokens}")
+            # print(f"Total Cost: ${usage.total_cost:.4f}")
+            # print(f"Usage Period: {usage.period}")
             
             # クォータ情報の取得
-            quota = self.openai_client.quota.retrieve()
+            # quota = self.openai_client.quota.retrieve()
             print("\n=== OpenAI API Quota ===")
-            print(f"Total Quota: ${quota.total_quota:.2f}")
-            print(f"Used Quota: ${quota.used_quota:.2f}")
-            print(f"Remaining Quota: ${quota.remaining_quota:.2f}")
-            print(f"Quota Period: {quota.period}")
+            # print(f"Total Quota: ${quota.total_quota:.2f}")
+            # print(f"Used Quota: ${quota.used_quota:.2f}")
+            # print(f"Remaining Quota: ${quota.remaining_quota:.2f}")
+            # print(f"Quota Period: {quota.period}")
             
             # 警告メッセージ
-            if quota.remaining_quota < 1.0:
-                print("\n⚠️ Warning: Remaining quota is less than $1.0")
-            if quota.remaining_quota < 0.1:
-                print("🚨 Critical: Remaining quota is less than $0.1")
+            # if quota.remaining_quota < 1.0:
+            #     print("\n⚠️ Warning: Remaining quota is less than $1.0")
+            # if quota.remaining_quota < 0.1:
+            #     print("🚨 Critical: Remaining quota is less than $0.1")
                 
         except Exception as e:
             error_message = str(e)
