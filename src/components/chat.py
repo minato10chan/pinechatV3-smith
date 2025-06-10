@@ -237,47 +237,45 @@ def render_chat(pinecone_service: PineconeService):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             if "details" in message and message["details"]:
-                with st.expander("詳細情報"):
-                    # タブを作成
-                    tab1, tab2, tab3 = st.tabs(["トークン数", "送信テキスト", "その他の情報"])
-                    
+                # 詳細情報を表示するボタン
+                if st.button("詳細情報を表示", key=f"details_{message['timestamp']}"):
                     # トークン数情報の表示
-                    with tab1:
-                        if "トークン数" in message["details"]:
-                            st.json(message["details"]["トークン数"])
+                    if "トークン数" in message["details"]:
+                        st.subheader("トークン数")
+                        st.json(message["details"]["トークン数"])
                     
                     # 送信テキストの表示
-                    with tab2:
-                        if "送信テキスト" in message["details"]:
-                            sent_text = message["details"]["送信テキスト"]
-                            
-                            # システムプロンプト
-                            st.subheader("システムプロンプト")
-                            st.text(sent_text["システムプロンプト"])
-                            
-                            # チャット履歴
-                            st.subheader("チャット履歴")
-                            for msg in sent_text["チャット履歴"]:
-                                st.text(f"[{msg['type']}]: {msg['content']}")
-                            
-                            # 参照文脈
-                            st.subheader("参照文脈")
-                            st.text(sent_text["参照文脈"])
-                            
-                            # 物件情報
-                            st.subheader("物件情報")
-                            st.text(sent_text["物件情報"])
-                            
-                            # ユーザー入力
-                            st.subheader("ユーザー入力")
-                            st.text(sent_text["ユーザー入力"])
+                    if "送信テキスト" in message["details"]:
+                        st.subheader("送信テキスト")
+                        sent_text = message["details"]["送信テキスト"]
+                        
+                        # システムプロンプト
+                        st.subheader("システムプロンプト")
+                        st.text(sent_text["システムプロンプト"])
+                        
+                        # チャット履歴
+                        st.subheader("チャット履歴")
+                        for msg in sent_text["チャット履歴"]:
+                            st.text(f"[{msg['type']}]: {msg['content']}")
+                        
+                        # 参照文脈
+                        st.subheader("参照文脈")
+                        st.text(sent_text["参照文脈"])
+                        
+                        # 物件情報
+                        st.subheader("物件情報")
+                        st.text(sent_text["物件情報"])
+                        
+                        # ユーザー入力
+                        st.subheader("ユーザー入力")
+                        st.text(sent_text["ユーザー入力"])
                     
                     # その他の詳細情報
-                    with tab3:
-                        other_details = {k: v for k, v in message["details"].items() 
-                                      if k not in ["トークン数", "送信テキスト"]}
-                        if other_details:
-                            st.json(other_details)
+                    other_details = {k: v for k, v in message["details"].items() 
+                                  if k not in ["トークン数", "送信テキスト"]}
+                    if other_details:
+                        st.subheader("その他の情報")
+                        st.json(other_details)
 
     # ユーザー入力
     if prompt := st.chat_input("メッセージを入力してください"):
