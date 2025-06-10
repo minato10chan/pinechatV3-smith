@@ -3,7 +3,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_pinecone import PineconeVectorStore
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import HumanMessage, AIMessage
+from langchain.schema import HumanMessage, AIMessage, SystemMessage
 import os
 import tiktoken
 from openai import OpenAI
@@ -233,6 +233,9 @@ class LangChainService:
                     elif role == "ai":
                         self.message_history.add_ai_message(content)
             
+            # 会話履歴を最適化
+            self.optimize_chat_history()
+            
             # プロンプトのトークン数をカウント
             prompt_tokens = self.count_tokens(system_prompt)
             print(f"システムプロンプトのトークン数: {prompt_tokens}")
@@ -303,6 +306,54 @@ class LangChainService:
             }
             
             return error_response, error_details
+
+    def optimize_chat_history(self, max_tokens: int = 12000) -> None:
+        """会話履歴を最適化し、重要なメッセージのみを保持"""
+        if not self.message_history.messages:
+            return
+
+        # 現在のトークン数を計算
+        current_tokens = sum(self.count_tokens(msg.content) for msg in self.message_history.messages)
+        
+        # トークン数が制限を超えていない場合は何もしない
+        if current_tokens <= max_tokens:
+            return
+
+        # メッセージを重要度で分類
+        important_messages = []
+        other_messages = []
+        
+        for msg in self.message_history.messages:
+            # システムメッセージは常に保持
+            if isinstance(msg, SystemMessage):
+                important_messages.append(msg)
+                continue
+                
+            # 最後のNメッセージは保持（Nは設定可能）
+            if len(important_messages) < 4:  # 最後の4メッセージを保持
+                important_messages.append(msg)
+                continue
+                
+            # その他のメッセージは一時的に保存
+            other_messages.append(msg)
+
+        # 重要メッセージのトークン数を計算
+        important_tokens = sum(self.count_tokens(msg.content) for msg in important_messages)
+        
+        # 残りのトークン数
+        remaining_tokens = max_tokens - important_tokens
+        
+        # 残りのトークン数に基づいて、他のメッセージを追加
+        for msg in reversed(other_messages):
+            msg_tokens = self.count_tokens(msg.content)
+            if msg_tokens <= remaining_tokens:
+                important_messages.insert(0, msg)  # 先頭に追加
+                remaining_tokens -= msg_tokens
+            else:
+                break
+
+        # 最適化されたメッセージで履歴を更新
+        self.message_history.messages = important_messages
 
     def clear_memory(self):
         """会話メモリをクリア"""
