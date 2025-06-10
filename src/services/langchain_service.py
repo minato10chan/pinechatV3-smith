@@ -244,6 +244,21 @@ class LangChainService:
             history_tokens = sum(self.count_tokens(msg.content) for msg in self.message_history.messages)
             print(f"チャット履歴のトークン数: {history_tokens}")
             
+            # デバッグ出力：送信されるすべてのテキストを表示
+            print("\n=== 送信されるテキスト ===")
+            print("\n--- システムプロンプト ---")
+            print(system_prompt)
+            print("\n--- チャット履歴 ---")
+            for msg in self.message_history.messages:
+                print(f"\n[{msg.type}]: {msg.content}")
+            print("\n--- 参照文脈 ---")
+            print(context)
+            if property_info:
+                print("\n--- 物件情報 ---")
+                print(property_info)
+            print("\n--- ユーザー入力 ---")
+            print(query)
+            
             # 応答を生成
             response = chain.invoke({
                 "chat_history": self.message_history.messages,
@@ -281,7 +296,14 @@ class LangChainService:
                     "応答テンプレート": response_template
                 },
                 "物件情報": property_info or "物件情報はありません。",
-                "会話履歴数": len(chat_history) if chat_history else 0
+                "会話履歴数": len(chat_history) if chat_history else 0,
+                "送信テキスト": {
+                    "システムプロンプト": system_prompt,
+                    "チャット履歴": [{"type": msg.type, "content": msg.content} for msg in self.message_history.messages],
+                    "参照文脈": context,
+                    "物件情報": property_info or "物件情報はありません。",
+                    "ユーザー入力": query
+                }
             }
             
             return response.content, details
@@ -307,16 +329,20 @@ class LangChainService:
             
             return error_response, error_details
 
-    def optimize_chat_history(self, max_tokens: int = 12000) -> None:
+    def optimize_chat_history(self, max_tokens: int = 14000) -> None:
         """会話履歴を最適化し、重要なメッセージのみを保持"""
         if not self.message_history.messages:
             return
+
+        # システムプロンプトとコンテキスト用のトークン数を確保（約2000トークン）
+        reserved_tokens = 2000
+        available_tokens = max_tokens - reserved_tokens
 
         # 現在のトークン数を計算
         current_tokens = sum(self.count_tokens(msg.content) for msg in self.message_history.messages)
         
         # トークン数が制限を超えていない場合は何もしない
-        if current_tokens <= max_tokens:
+        if current_tokens <= available_tokens:
             return
 
         # メッセージを重要度で分類
@@ -330,7 +356,7 @@ class LangChainService:
                 continue
                 
             # 最後のNメッセージは保持（Nは設定可能）
-            if len(important_messages) < 4:  # 最後の4メッセージを保持
+            if len(important_messages) < 3:  # 最後の3メッセージを保持
                 important_messages.append(msg)
                 continue
                 
@@ -341,7 +367,7 @@ class LangChainService:
         important_tokens = sum(self.count_tokens(msg.content) for msg in important_messages)
         
         # 残りのトークン数
-        remaining_tokens = max_tokens - important_tokens
+        remaining_tokens = available_tokens - important_tokens
         
         # 残りのトークン数に基づいて、他のメッセージを追加
         for msg in reversed(other_messages):
@@ -354,6 +380,13 @@ class LangChainService:
 
         # 最適化されたメッセージで履歴を更新
         self.message_history.messages = important_messages
+
+        # デバッグ情報の出力
+        final_tokens = sum(self.count_tokens(msg.content) for msg in self.message_history.messages)
+        print(f"\n=== Chat History Optimization ===")
+        print(f"Original tokens: {current_tokens}")
+        print(f"Final tokens: {final_tokens}")
+        print(f"Messages kept: {len(self.message_history.messages)}")
 
     def clear_memory(self):
         """会話メモリをクリア"""
