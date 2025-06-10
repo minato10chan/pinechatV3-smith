@@ -256,6 +256,18 @@ def render_chat(pinecone_service: PineconeService):
                             st.text_area("システムプロンプト", sent_text["システムプロンプト"], height=100)
                             st.text_area("チャット履歴", "\n".join([f"[{msg['type']}]: {msg['content']}" for msg in sent_text["チャット履歴"]]), height=200)
                             st.text_area("参照文脈", sent_text["参照文脈"], height=100)
+                            
+                            # 参照文脈の詳細情報を表示
+                            if "参照文脈の詳細" in sent_text:
+                                st.markdown("**参照文脈の詳細**")
+                                for i, detail in enumerate(sent_text["参照文脈の詳細"], 1):
+                                    st.markdown(f"**参照 {i}**")
+                                    st.write(f"ファイル名: {detail['ファイル名']}")
+                                    st.write(f"ページ番号: {detail['ページ番号']}")
+                                    st.write(f"セクション: {detail['セクション']}")
+                                    st.write(f"スコア: {detail['スコア']}")
+                                    st.text_area(f"テキスト {i}", detail['テキスト'], height=100)
+                            
                             st.text_area("物件情報", sent_text["物件情報"], height=100)
                             st.text_area("ユーザー入力", sent_text["ユーザー入力"], height=100)
                     

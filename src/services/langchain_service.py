@@ -160,7 +160,10 @@ class LangChainService:
                 detail = {
                     "スコア": round(doc["score"], 4),
                     "テキスト": doc["content"][:100] + "...",
-                    "メタデータ": doc["metadata"]
+                    "メタデータ": doc["metadata"],
+                    "ファイル名": doc["metadata"].get("source", "不明"),
+                    "ページ番号": doc["metadata"].get("page", "不明"),
+                    "セクション": doc["metadata"].get("section", "不明")
                 }
                 search_details.append(detail)
             
@@ -272,28 +275,19 @@ class LangChainService:
                 "モデル": "gpt-4o-mini",
                 "会話履歴": "有効",
                 "トークン数": {
-                    "クエリ": self.count_tokens(query),
                     "システムプロンプト": prompt_tokens,
                     "チャット履歴": history_tokens,
-                    "コンテキスト": self.count_tokens(context),
-                    "応答": response_tokens,
-                    "合計": prompt_tokens + history_tokens + self.count_tokens(context) + response_tokens
+                    "参照文脈": context_tokens,
+                    "物件情報": self.count_tokens(property_info) if property_info else 0,
+                    "ユーザー入力": self.count_tokens(query),
+                    "合計": prompt_tokens + history_tokens + context_tokens + (self.count_tokens(property_info) if property_info else 0)
                 },
-                "文脈検索": {
-                    "検索結果数": len(search_details),
-                    "マッチしたチャンク": search_details
-                },
-                "プロンプト": {
-                    "システムプロンプト": system_prompt,
-                    "応答テンプレート": response_template
-                },
-                "物件情報": property_info or "物件情報はありません。",
-                "会話履歴数": len(chat_history) if chat_history else 0,
                 "送信テキスト": {
                     "システムプロンプト": system_prompt,
                     "チャット履歴": [{"type": msg.type, "content": msg.content} for msg in self.message_history.messages],
                     "参照文脈": context,
-                    "物件情報": property_info or "物件情報はありません。",
+                    "参照文脈の詳細": search_details,
+                    "物件情報": property_info,
                     "ユーザー入力": query
                 }
             }
