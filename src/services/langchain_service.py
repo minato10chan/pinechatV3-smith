@@ -329,13 +329,13 @@ class LangChainService:
             
             return error_response, error_details
 
-    def optimize_chat_history(self, max_tokens: int = 14000) -> None:
+    def optimize_chat_history(self, max_tokens: int = 12000) -> None:
         """会話履歴を最適化し、重要なメッセージのみを保持"""
         if not self.message_history.messages:
             return
 
-        # システムプロンプトとコンテキスト用のトークン数を確保（約2000トークン）
-        reserved_tokens = 2000
+        # システムプロンプトとコンテキスト用のトークン数を確保（約3000トークン）
+        reserved_tokens = 3000
         available_tokens = max_tokens - reserved_tokens
 
         # 現在のトークン数を計算
@@ -349,28 +349,29 @@ class LangChainService:
         important_messages = []
         other_messages = []
         
+        # システムメッセージを保持
         for msg in self.message_history.messages:
-            # システムメッセージは常に保持
             if isinstance(msg, SystemMessage):
                 important_messages.append(msg)
                 continue
-                
-            # 最後のNメッセージは保持（Nは設定可能）
-            if len(important_messages) < 3:  # 最後の3メッセージを保持
-                important_messages.append(msg)
-                continue
-                
-            # その他のメッセージは一時的に保存
             other_messages.append(msg)
+
+        # 最新の2メッセージを保持（ユーザーとAIの1往復）
+        if len(other_messages) >= 2:
+            important_messages.extend(other_messages[-2:])
+            other_messages = other_messages[:-2]
 
         # 重要メッセージのトークン数を計算
         important_tokens = sum(self.count_tokens(msg.content) for msg in important_messages)
         
         # 残りのトークン数
         remaining_tokens = available_tokens - important_tokens
-        
+
         # 残りのトークン数に基づいて、他のメッセージを追加
-        for msg in reversed(other_messages):
+        # メッセージを長さでソート（短いものから）
+        other_messages.sort(key=lambda x: self.count_tokens(x.content))
+        
+        for msg in other_messages:
             msg_tokens = self.count_tokens(msg.content)
             if msg_tokens <= remaining_tokens:
                 important_messages.insert(0, msg)  # 先頭に追加
@@ -387,6 +388,8 @@ class LangChainService:
         print(f"Original tokens: {current_tokens}")
         print(f"Final tokens: {final_tokens}")
         print(f"Messages kept: {len(self.message_history.messages)}")
+        print(f"Available tokens: {available_tokens}")
+        print(f"Remaining tokens: {remaining_tokens}")
 
     def clear_memory(self):
         """会話メモリをクリア"""
