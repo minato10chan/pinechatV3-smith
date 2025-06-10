@@ -114,32 +114,43 @@ class LangChainService:
             # より多くの結果を取得して、後でフィルタリング
             docs = self.vectorstore.similarity_search_with_score(query, k=top_k * 2)
             
-            # メタデータも検索対象に含める
+            # メタデータを簡略化して保持
+            simplified_docs = []
             for doc in docs:
-                # メタデータの各フィールドを検索対象に追加
-                metadata_text = []
+                # メタデータを簡略化
+                simplified_metadata = {}
                 for key, value in doc[0].metadata.items():
                     if isinstance(value, str):
-                        # メタデータの値をテキストに追加
-                        metadata_text.append(f"{key}: {value}")
+                        # メタデータの値を短くする（最大100文字）
+                        simplified_metadata[key] = value[:100] + "..." if len(value) > 100 else value
                 
-                # メタデータをテキストの前に追加
-                if metadata_text:
-                    doc[0].page_content = "\n".join(metadata_text) + "\n\n" + doc[0].page_content
+                # テキストを短くする（最大500文字）
+                content = doc[0].page_content
+                if len(content) > 500:
+                    content = content[:500] + "..."
+                
+                # 簡略化したドキュメントを作成
+                simplified_doc = {
+                    "content": content,
+                    "metadata": simplified_metadata,
+                    "score": doc[1]
+                }
+                simplified_docs.append(simplified_doc)
             
             # スコアでフィルタリング
             filtered_docs = []
-            for doc in docs:
-                if doc[1] >= SIMILARITY_THRESHOLD:
+            for doc in simplified_docs:
+                if doc["score"] >= SIMILARITY_THRESHOLD:
                     filtered_docs.append(doc)
                     if len(filtered_docs) >= top_k:
                         break
             
             # フィルタリング後の結果が0件の場合は、スコアに関係なく上位K件を使用
-            if not filtered_docs and docs:
-                filtered_docs = docs[:top_k]
+            if not filtered_docs and simplified_docs:
+                filtered_docs = simplified_docs[:top_k]
             
-            context_text = "\n".join([doc[0].page_content for doc in filtered_docs])
+            # コンテキストテキストを作成（メタデータを含めない）
+            context_text = "\n".join([doc["content"] for doc in filtered_docs])
             
             # コンテキストのトークン数をカウント
             context_tokens = self.count_tokens(context_text)
@@ -148,28 +159,11 @@ class LangChainService:
             search_details = []
             for doc in filtered_docs:
                 detail = {
-                    "スコア": round(doc[1], 4),  # 類似度スコアを小数点4桁まで表示
-                    "テキスト": doc[0].page_content[:100] + "...",  # テキストの一部を表示
-                    "メタデータ": doc[0].metadata,  # メタデータを追加
-                    "類似度判断": {
-                        "閾値": SIMILARITY_THRESHOLD,
-                        "閾値以上": doc[1] >= SIMILARITY_THRESHOLD,
-                        "スコア詳細": f"スコア {round(doc[1], 4)} は閾値 {SIMILARITY_THRESHOLD} に対して {'以上' if doc[1] >= SIMILARITY_THRESHOLD else '未満'}",
-                        "理解過程": {
-                            "クエリ": query,
-                            "テキスト": doc[0].page_content,
-                            "類似度計算": {
-                                "スコア": round(doc[1], 4)
-                            }
-                        }
-                    }
+                    "スコア": round(doc["score"], 4),
+                    "テキスト": doc["content"][:100] + "...",
+                    "メタデータ": doc["metadata"]
                 }
                 search_details.append(detail)
-            
-            print(f"検索クエリ: {query}")  # デバッグ用
-            print(f"検索結果数: {len(filtered_docs)}")  # デバッグ用
-            for detail in search_details:
-                print(f"スコア: {detail['スコア']}, テキスト: {detail['テキスト']}")  # デバッグ用
             
             return context_text, search_details
             
@@ -179,7 +173,6 @@ class LangChainService:
                 print("\n🚨 Critical: API quota has been exceeded!")
                 print("Please check your OpenAI API key and billing settings.")
                 print("You can check your usage and quota at: https://platform.openai.com/account/usage")
-                # 空のコンテキストとエラー詳細を返す
                 return "", [{
                     "エラー": True,
                     "エラーメッセージ": "API quota has been exceeded",
@@ -329,13 +322,13 @@ class LangChainService:
             
             return error_response, error_details
 
-    def optimize_chat_history(self, max_tokens: int = 12000) -> None:
+    def optimize_chat_history(self, max_tokens: int = 10000) -> None:
         """会話履歴を最適化し、重要なメッセージのみを保持"""
         if not self.message_history.messages:
             return
 
-        # システムプロンプトとコンテキスト用のトークン数を確保（約3000トークン）
-        reserved_tokens = 3000
+        # システムプロンプトとコンテキスト用のトークン数を確保（約4000トークン）
+        reserved_tokens = 4000
         available_tokens = max_tokens - reserved_tokens
 
         # 現在のトークン数を計算
@@ -356,10 +349,10 @@ class LangChainService:
                 continue
             other_messages.append(msg)
 
-        # 最新の2メッセージを保持（ユーザーとAIの1往復）
-        if len(other_messages) >= 2:
-            important_messages.extend(other_messages[-2:])
-            other_messages = other_messages[:-2]
+        # 最新の1メッセージのみを保持
+        if other_messages:
+            important_messages.append(other_messages[-1])
+            other_messages = other_messages[:-1]
 
         # 重要メッセージのトークン数を計算
         important_tokens = sum(self.count_tokens(msg.content) for msg in important_messages)
