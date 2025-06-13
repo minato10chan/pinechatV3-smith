@@ -100,7 +100,7 @@ class LangChainService:
         """テキストのトークン数をカウント"""
         return len(self.encoding.encode(text))
 
-    def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K) -> Tuple[str, List[Dict[str, Any]]]:
+    def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K) -> Tuple[str, List[Dict[str, Any]], int]:
         """クエリに関連する文脈を取得"""
         try:
             # クエリのトークン数をカウント
@@ -167,7 +167,7 @@ class LangChainService:
                 }
                 search_details.append(detail)
             
-            return context_text, search_details
+            return context_text, search_details, context_tokens
             
         except Exception as e:
             error_message = str(e)
@@ -180,14 +180,14 @@ class LangChainService:
                     "エラーメッセージ": "API quota has been exceeded",
                     "エラータイプ": "API Quota Error",
                     "推奨アクション": "Please update your API key in Streamlit Cloud settings"
-                }]
+                }], 0
             else:
                 print(f"\n❌ Error in get_relevant_context: {error_message}")
                 return "", [{
                     "エラー": True,
                     "エラーメッセージ": error_message,
                     "エラータイプ": "Unknown Error"
-                }]
+                }], 0
 
     def get_response(self, query: str, system_prompt: str = None, response_template: str = None, property_info: str = None, chat_history: list = None) -> Tuple[str, Dict[str, Any]]:
         """クエリに対する応答を生成"""
@@ -217,7 +217,7 @@ class LangChainService:
             chain = prompt | self.llm
             
             # 関連する文脈を取得
-            context, search_details = self.get_relevant_context(query)
+            context, search_details, context_tokens = self.get_relevant_context(query)
             
             # チャット履歴を設定
             if chat_history:
