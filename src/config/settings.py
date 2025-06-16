@@ -22,6 +22,7 @@ PINECONE_ASSISTANT_NAME = os.getenv("PINECONE_ASSISTANT_NAME") or st.secrets.get
 # Text Processing Settings
 CHUNK_SIZE = 500  # テキストを分割する際の1チャンクあたりの文字数
 BATCH_SIZE = 100  # Pineconeへのアップロード時のバッチサイズ
+PROPERTY_MAX_TOKENS = 8000  # 物件情報チャンクの最大トークン数（Pineconeの40KB制限に基づく）
 
 # OpenAI Settings
 EMBEDDING_MODEL = "text-embedding-3-large"  # 使用する埋め込みモデル
@@ -205,4 +206,4 @@ METADATA_CATEGORIES = {
         "川崎市",
         "相模原市",
     ]
-} 
+}   
