@@ -78,6 +78,23 @@ class PineconeService:
                             raise create_error
                 else:
                     print(f"インデックス '{PINECONE_INDEX_NAME}' は既に存在します")
+                    # 既存のインデックスを削除して再作成
+                    print(f"既存のインデックスを削除して再作成します")
+                    self.pc.delete_index(PINECONE_INDEX_NAME)
+                    time.sleep(5)  # 削除完了を待機
+                    self.pc.create_index(
+                        name=PINECONE_INDEX_NAME,
+                        dimension=3072,
+                        metric="cosine",
+                        spec={
+                            "serverless": {
+                                "cloud": "aws",
+                                "region": "us-east-1"
+                            }
+                        }
+                    )
+                    print(f"インデックス '{PINECONE_INDEX_NAME}' を再作成しました")
+                    time.sleep(10)  # 作成完了を待機
                 
                 # インデックスの取得
                 self.index = self.pc.Index(PINECONE_INDEX_NAME)
