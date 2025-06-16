@@ -42,37 +42,50 @@ def split_property_data(property_data: dict, max_tokens: int = 8000) -> list:
     # 詳細情報を段落で分割
     paragraphs = [p.strip() for p in details.split('\n') if p.strip()]
     
-    chunks = []
-    current_chunk = base_info.copy()
-    current_text = json.dumps(current_chunk, ensure_ascii=False)
+    # 段落を意味のある単位でグループ化
+    groups = []
+    current_group = []
+    current_length = 0
     
     for paragraph in paragraphs:
-        # 段落を追加した場合のテキスト
-        test_chunk = current_chunk.copy()
-        test_chunk["property_details"] = test_chunk.get("property_details", "") + "\n" + paragraph
-        test_text = json.dumps(test_chunk, ensure_ascii=False)
+        # 段落のトークン数を計算
+        paragraph_tokens = len(encoding.encode(paragraph))
         
-        # トークン数をチェック
-        if len(encoding.encode(test_text)) <= max_tokens:
-            current_chunk = test_chunk
-            current_text = test_text
+        # 現在のグループに追加した場合の長さを計算
+        if current_group:
+            test_text = "\n".join(current_group + [paragraph])
         else:
-            # 現在のチャンクを保存
-            chunks.append({
-                "text": current_text,
-                "metadata": current_chunk
-            })
-            # 新しいチャンクを開始
-            current_chunk = base_info.copy()
-            current_chunk["property_details"] = paragraph
-            current_text = json.dumps(current_chunk, ensure_ascii=False)
+            test_text = paragraph
+        
+        test_tokens = len(encoding.encode(test_text))
+        
+        # グループの長さが制限を超える場合、新しいグループを開始
+        if test_tokens > max_tokens // 2:  # 最大トークン数の半分を基準に分割
+            if current_group:
+                groups.append(current_group)
+            current_group = [paragraph]
+            current_length = paragraph_tokens
+        else:
+            current_group.append(paragraph)
+            current_length = test_tokens
     
-    # 最後のチャンクを追加
-    if current_text:
-        chunks.append({
-            "text": current_text,
-            "metadata": current_chunk
-        })
+    # 最後のグループを追加
+    if current_group:
+        groups.append(current_group)
+    
+    # グループごとにチャンクを作成
+    chunks = []
+    for i, group in enumerate(groups):
+        chunk_info = base_info.copy()
+        chunk_info["property_details"] = "\n".join(group)
+        chunk_info["chunk_number"] = i + 1
+        chunk_info["total_chunks"] = len(groups)
+        
+        chunk = {
+            "text": json.dumps(chunk_info, ensure_ascii=False),
+            "metadata": chunk_info
+        }
+        chunks.append(chunk)
     
     return chunks
 
