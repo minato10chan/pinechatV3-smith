@@ -291,9 +291,12 @@ class PineconeService:
     def get_index_data(self) -> List[Dict]:
         """インデックスのデータを取得"""
         try:
+            # ダミーベクトルを作成（3072次元のゼロベクトル）
+            dummy_vector = [0.0] * 3072
+            
             # デフォルトnamespaceのデータを取得
             results = self.index.query(
-                vector=[0] * 1536,  # ダミーベクトル
+                vector=dummy_vector,  # ダミーベクトルを指定
                 top_k=1000,
                 include_metadata=True,
                 namespace=""
