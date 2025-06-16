@@ -258,12 +258,12 @@ def render_settings(pinecone_service: PineconeService):
                 for namespace in namespaces:
                     try:
                         # namespaceの存在確認
-                        if namespace not in stats.namespaces:
+                        if namespace not in stats["namespaces"]:
                             st.info(f"ℹ️ {namespace} namespaceは存在しません。")
                             continue
                             
                         # namespaceのベクトル数を確認
-                        namespace_stats = stats.namespaces.get(namespace, {})
+                        namespace_stats = stats["namespaces"].get(namespace, {})
                         vector_count = namespace_stats.get('vector_count', 0)
                         
                         if vector_count == 0:
