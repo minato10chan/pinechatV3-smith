@@ -101,7 +101,7 @@ class LangChainService:
         """テキストのトークン数をカウント"""
         return len(self.encoding.encode(text))
 
-    def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K) -> Tuple[str, List[Dict[str, Any]], int]:
+    def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K, similarity_threshold: float = SIMILARITY_THRESHOLD) -> Tuple[str, List[Dict[str, Any]], int]:
         """クエリに関連する文脈を取得"""
         try:
             # クエリのトークン数をカウント
@@ -140,7 +140,7 @@ class LangChainService:
             # スコアでフィルタリング（しきい値未満は除外）
             filtered_docs = [
                 doc for doc in simplified_docs
-                if doc["score"] >= SIMILARITY_THRESHOLD
+                if doc["score"] >= similarity_threshold
             ]
             
             print(f"しきい値以上の候補数: {len(filtered_docs)}")
@@ -192,7 +192,7 @@ class LangChainService:
                     "エラータイプ": "Unknown Error"
                 }], 0
 
-    def get_response(self, query: str, system_prompt: str = None, response_template: str = None, property_info: str = None, chat_history: list = None) -> Tuple[str, Dict[str, Any]]:
+    def get_response(self, query: str, system_prompt: str = None, response_template: str = None, property_info: str = None, chat_history: list = None, similarity_threshold: float = SIMILARITY_THRESHOLD) -> Tuple[str, Dict[str, Any]]:
         """クエリに対する応答を生成"""
         try:
             # プロンプトの設定
@@ -220,7 +220,7 @@ class LangChainService:
             chain = prompt | self.llm
             
             # 関連する文脈を取得
-            context, search_details, context_tokens = self.get_relevant_context(query)
+            context, search_details, context_tokens = self.get_relevant_context(query, similarity_threshold=similarity_threshold)
             
             # チャット履歴を設定
             if chat_history:

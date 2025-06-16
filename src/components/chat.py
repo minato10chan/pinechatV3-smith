@@ -203,7 +203,8 @@ def render_chat(pinecone_service: PineconeService):
                 
                 # 物件の詳細情報を表示
                 st.subheader("選択中の物件情報")
-                st.markdown(st.session_state.property_info)
+                with st.expander("物件情報を表示/非表示", expanded=False):
+                    st.markdown(st.session_state.property_info)
             else:
                 st.warning("物件情報が登録されていません。")
                 st.session_state.property_info = "物件情報が登録されていません。"
@@ -344,7 +345,8 @@ def render_chat(pinecone_service: PineconeService):
                 system_prompt=selected_template_data["system_prompt"],
                 response_template=selected_template_data["response_template"],
                 property_info=st.session_state.get("property_info", "物件情報はありません。"),
-                chat_history=chat_history  # 会話履歴を渡す
+                chat_history=chat_history,  # 会話履歴を渡す
+                similarity_threshold=st.session_state.get("similarity_threshold", 0.7)
             )
             
             # アシスタントの応答を追加
