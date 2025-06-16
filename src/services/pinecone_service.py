@@ -359,14 +359,29 @@ class PineconeService:
             if namespace and namespace not in stats.namespaces:
                 return []
             
-            # 指定されたnamespaceからベクトルを取得
-            results = self.index.fetch(
-                ids=[],  # 空のリストを渡すと全ベクトルを取得
+            # ダミーベクトルを作成（全要素が0のベクトル）
+            dummy_vector = [0.0] * self.dimension
+            
+            # クエリを使用してベクトルIDを取得
+            results = self.index.query(
+                vector=dummy_vector,
+                top_k=limit,  # 指定された制限数を使用
+                include_metadata=True,
+                namespace=namespace
+            )
+            
+            if not results.matches:
+                return []
+            
+            # 取得したIDを使用してベクトルを取得
+            vector_ids = [match.id for match in results.matches]
+            fetch_results = self.index.fetch(
+                ids=vector_ids,
                 namespace=namespace
             )
             
             # 結果を制限
-            vectors = list(results.vectors.values())[:limit] if results.vectors else []
+            vectors = list(fetch_results.vectors.values())[:limit] if fetch_results.vectors else []
             
             return vectors
         except Exception as e:

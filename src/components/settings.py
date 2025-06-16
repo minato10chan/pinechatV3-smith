@@ -257,10 +257,26 @@ def render_settings(pinecone_service: PineconeService):
                 namespaces = ["default", "property"]
                 for namespace in namespaces:
                     try:
-                        vectors = pinecone_service.list_vectors(namespace=namespace)
-                        if vectors:
-                            st.markdown(f"#### 📋 {namespace} namespaceの内容")
+                        # namespaceの存在確認
+                        if namespace not in stats.namespaces:
+                            st.info(f"ℹ️ {namespace} namespaceは存在しません。")
+                            continue
                             
+                        # namespaceのベクトル数を確認
+                        namespace_stats = stats.namespaces.get(namespace, {})
+                        vector_count = namespace_stats.get('vector_count', 0)
+                        
+                        if vector_count == 0:
+                            st.info(f"ℹ️ {namespace} namespaceにデータがありません。")
+                            continue
+                            
+                        st.markdown(f"#### 📋 {namespace} namespaceの内容")
+                        st.markdown(f"##### 📊 ベクトル数: {vector_count}件")
+                        
+                        # ベクトルを取得
+                        vectors = pinecone_service.list_vectors(namespace=namespace, limit=100)
+                        
+                        if vectors:
                             # メタデータをDataFrameに変換
                             metadata_list = []
                             for vector in vectors:
@@ -284,8 +300,6 @@ def render_settings(pinecone_service: PineconeService):
                                         'latitude',
                                         'longitude'
                                     ]
-                                    # 物件情報の件数を表示
-                                    st.markdown(f"##### 📊 物件情報の件数: {len(metadata_list)}件")
                                     
                                     # 市区町村ごとの件数を表示
                                     city_counts = df['city'].value_counts().reset_index()
@@ -298,7 +312,6 @@ def render_settings(pinecone_service: PineconeService):
                                     )
                                 else:
                                     # デフォルトnamespaceの表示
-                                    # 既存のデータと新しいデータの両方に対応
                                     display_columns = [
                                         'main_category',
                                         'sub_category',
@@ -344,9 +357,13 @@ def render_settings(pinecone_service: PineconeService):
                                 else:
                                     st.info(f"{namespace} namespaceに表示可能なデータがありません。")
                             else:
-                                st.info(f"{namespace} namespaceにデータがありません。")
+                                st.info(f"{namespace} namespaceにメタデータがありません。")
+                        else:
+                            st.info(f"{namespace} namespaceにベクトルがありません。")
                     except Exception as e:
                         st.error(f"{namespace} namespaceのデータ取得に失敗しました: {str(e)}")
+                        st.error(f"🔍 エラーの詳細: {type(e).__name__}")
+                        st.error(f"📜 スタックトレース:\n{traceback.format_exc()}")
                         continue
                     
             except Exception as e:
