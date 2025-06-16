@@ -296,13 +296,26 @@ class PineconeService:
             # 全ベクトルのIDを取得
             all_vectors = []
             for namespace in stats.namespaces:
-                # 各namespaceからベクトルを取得
-                results = self.index.fetch(
-                    ids=[],  # 空のリストを渡すと全ベクトルを取得
+                # ダミーベクトルを作成（全要素が0のベクトル）
+                dummy_vector = [0.0] * self.dimension
+                
+                # クエリを使用してベクトルIDを取得
+                results = self.index.query(
+                    vector=dummy_vector,
+                    top_k=10000,  # 十分大きな数を指定
+                    include_metadata=True,
                     namespace=namespace
                 )
-                if results.vectors:
-                    all_vectors.extend(results.vectors.values())
+                
+                if results.matches:
+                    # 取得したIDを使用してベクトルを取得
+                    vector_ids = [match.id for match in results.matches]
+                    fetch_results = self.index.fetch(
+                        ids=vector_ids,
+                        namespace=namespace
+                    )
+                    if fetch_results.vectors:
+                        all_vectors.extend(fetch_results.vectors.values())
             
             # メタデータを抽出
             data = []
