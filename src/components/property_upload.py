@@ -5,7 +5,6 @@ import json
 import traceback
 from datetime import datetime
 import tiktoken
-import re
 
 # 都道府県と市区町村のデータ
 PREFECTURES = [
@@ -20,53 +19,8 @@ CITIES = {
     # 他の都道府県の市区町村も同様に追加可能
 }
 
-def find_natural_split_point(text: str, max_tokens: int = 8000) -> int:
-    """テキストの自然な分割ポイントを見つける"""
-    encoding = tiktoken.encoding_for_model("text-embedding-3-large")
-    
-    # 文章の区切りを表す正規表現パターン
-    split_patterns = [
-        r'。\n',  # 句点+改行
-        r'。',    # 句点
-        r'！\n',  # 感嘆符+改行
-        r'！',    # 感嘆符
-        r'？\n',  # 疑問符+改行
-        r'？',    # 疑問符
-        r'\n\n',  # 空行
-        r'\n',    # 改行
-        r'、',    # 読点
-        r' ',     # スペース
-    ]
-    
-    # テキストをトークンに分割
-    tokens = encoding.encode(text)
-    if len(tokens) <= max_tokens:
-        return len(text)
-    
-    # 目標の分割位置（トークン数の半分）
-    target_position = len(tokens) // 2
-    
-    # 各パターンで分割位置を探す
-    for pattern in split_patterns:
-        # パターンにマッチする位置を全て取得
-        matches = list(re.finditer(pattern, text))
-        if not matches:
-            continue
-            
-        # 目標位置に最も近い分割位置を見つける
-        best_match = min(matches, key=lambda m: abs(m.end() - target_position))
-        split_position = best_match.end()
-        
-        # 分割位置のトークン数を確認
-        split_tokens = len(encoding.encode(text[:split_position]))
-        if split_tokens <= max_tokens:
-            return split_position
-    
-    # 適切な分割位置が見つからない場合は、単純に半分の位置で分割
-    return len(text) // 2
-
 def split_property_data(property_data: dict, max_tokens: int = 8000) -> list:
-    """物件データを2つのチャンクに分割する"""
+    """物件データを複数のチャンクに分割する"""
     encoding = tiktoken.encoding_for_model("text-embedding-3-large")
     
     # 基本情報（常に含める）
@@ -85,40 +39,40 @@ def split_property_data(property_data: dict, max_tokens: int = 8000) -> list:
     if not details:
         return [{"text": json.dumps(base_info, ensure_ascii=False), "metadata": base_info}]
     
-    # テキスト全体のトークン数を確認
-    full_text = json.dumps({**base_info, "property_details": details}, ensure_ascii=False)
-    if len(encoding.encode(full_text)) <= max_tokens:
-        return [{"text": full_text, "metadata": base_info}]
+    # 詳細情報を段落で分割
+    paragraphs = [p.strip() for p in details.split('\n') if p.strip()]
     
-    # 自然な分割ポイントを見つける
-    split_point = find_natural_split_point(details)
-    
-    # 2つのチャンクに分割
-    first_half = details[:split_point]
-    second_half = details[split_point:]
-    
-    # チャンクを作成
     chunks = []
+    current_chunk = base_info.copy()
+    current_text = json.dumps(current_chunk, ensure_ascii=False)
     
-    # 最初のチャンク
-    first_chunk = base_info.copy()
-    first_chunk["property_details"] = first_half
-    first_chunk["is_first_chunk"] = True
-    first_chunk["total_chunks"] = 2
-    chunks.append({
-        "text": json.dumps(first_chunk, ensure_ascii=False),
-        "metadata": first_chunk
-    })
+    for paragraph in paragraphs:
+        # 段落を追加した場合のテキスト
+        test_chunk = current_chunk.copy()
+        test_chunk["property_details"] = test_chunk.get("property_details", "") + "\n" + paragraph
+        test_text = json.dumps(test_chunk, ensure_ascii=False)
+        
+        # トークン数をチェック
+        if len(encoding.encode(test_text)) <= max_tokens:
+            current_chunk = test_chunk
+            current_text = test_text
+        else:
+            # 現在のチャンクを保存
+            chunks.append({
+                "text": current_text,
+                "metadata": current_chunk
+            })
+            # 新しいチャンクを開始
+            current_chunk = base_info.copy()
+            current_chunk["property_details"] = paragraph
+            current_text = json.dumps(current_chunk, ensure_ascii=False)
     
-    # 2番目のチャンク
-    second_chunk = base_info.copy()
-    second_chunk["property_details"] = second_half
-    second_chunk["is_first_chunk"] = False
-    second_chunk["total_chunks"] = 2
-    chunks.append({
-        "text": json.dumps(second_chunk, ensure_ascii=False),
-        "metadata": second_chunk
-    })
+    # 最後のチャンクを追加
+    if current_text:
+        chunks.append({
+            "text": current_text,
+            "metadata": current_chunk
+        })
     
     return chunks
 
@@ -163,7 +117,7 @@ def render_property_upload(pinecone_service: PineconeService):
         # 物件の詳細情報
         property_details = st.text_area(
             "物件の詳細情報",
-            help="物件の詳細な情報を入力してください（長い文章は自然な区切りで2つに分割されます）"
+            help="物件の詳細な情報を入力してください（長い文章は自動的に分割されます）"
         )
         
         # 緯度・経度
@@ -214,11 +168,7 @@ def render_property_upload(pinecone_service: PineconeService):
                 # Pineconeへのアップロード
                 pinecone_service.upload_chunks(chunks, namespace="property")
                 
-                if len(chunks) > 1:
-                    st.success(f"✅ 物件情報を2つのチャンクに分割してアップロードしました")
-                    st.info("📝 詳細情報が長いため、自然な区切りで2つに分割しました")
-                else:
-                    st.success("✅ 物件情報をアップロードしました")
+                st.success(f"✅ 物件情報を{len(chunks)}件のチャンクに分割してアップロードしました")
                 
             except Exception as e:
                 st.error(f"❌ アップロードに失敗しました: {str(e)}")

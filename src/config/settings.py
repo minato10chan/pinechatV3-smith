@@ -24,7 +24,8 @@ CHUNK_SIZE = 500  # テキストを分割する際の1チャンクあたりの�
 BATCH_SIZE = 100  # Pineconeへのアップロード時のバッチサイズ
 
 # OpenAI Settings
-EMBEDDING_MODEL = "text-embedding-ada-002"  # 使用する埋め込みモデル
+EMBEDDING_MODEL = "text-embedding-3-large"  # 使用する埋め込みモデル
+EMBEDDING_DIMENSION = 3072  # 埋め込みベクトルの次元数
 
 # Search Settings
 DEFAULT_TOP_K = 10  # デフォルトの検索結果数
