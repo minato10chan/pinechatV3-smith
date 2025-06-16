@@ -19,7 +19,7 @@ CITIES = {
     # 他の都道府県の市区町村も同様に追加可能
 }
 
-def split_property_data(property_data: dict, max_tokens: int = 8000) -> list:
+def split_property_data(property_data: dict, max_tokens: int = 6000) -> list:
     """物件データを複数のチャンクに分割する"""
     encoding = tiktoken.encoding_for_model("text-embedding-3-large")
     
@@ -81,11 +81,50 @@ def split_property_data(property_data: dict, max_tokens: int = 8000) -> list:
         chunk_info["chunk_number"] = i + 1
         chunk_info["total_chunks"] = len(groups)
         
-        chunk = {
-            "text": json.dumps(chunk_info, ensure_ascii=False),
-            "metadata": chunk_info
-        }
-        chunks.append(chunk)
+        # チャンクのトークン数を確認
+        chunk_text = json.dumps(chunk_info, ensure_ascii=False)
+        chunk_tokens = len(encoding.encode(chunk_text))
+        
+        if chunk_tokens > max_tokens:
+            # チャンクが大きすぎる場合は、さらに小さく分割
+            sub_chunks = []
+            current_sub_chunk = []
+            current_sub_length = 0
+            
+            for paragraph in group:
+                paragraph_tokens = len(encoding.encode(paragraph))
+                if current_sub_length + paragraph_tokens > max_tokens // 2:
+                    if current_sub_chunk:
+                        sub_chunks.append(current_sub_chunk)
+                    current_sub_chunk = [paragraph]
+                    current_sub_length = paragraph_tokens
+                else:
+                    current_sub_chunk.append(paragraph)
+                    current_sub_length += paragraph_tokens
+            
+            if current_sub_chunk:
+                sub_chunks.append(current_sub_chunk)
+            
+            # サブチャンクごとにチャンクを作成
+            for j, sub_group in enumerate(sub_chunks):
+                sub_chunk_info = base_info.copy()
+                sub_chunk_info["property_details"] = "\n".join(sub_group)
+                sub_chunk_info["chunk_number"] = i + 1
+                sub_chunk_info["sub_chunk_number"] = j + 1
+                sub_chunk_info["total_chunks"] = len(groups)
+                sub_chunk_info["total_sub_chunks"] = len(sub_chunks)
+                
+                chunk = {
+                    "text": json.dumps(sub_chunk_info, ensure_ascii=False),
+                    "metadata": sub_chunk_info
+                }
+                chunks.append(chunk)
+        else:
+            chunk = {
+                "text": chunk_text,
+                "metadata": chunk_info
+            }
+            chunks.append(chunk)
     
     return chunks
 
