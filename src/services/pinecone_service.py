@@ -344,14 +344,23 @@ class PineconeService:
     def list_vectors(self, namespace: str = None, limit: int = 1000) -> list:
         """指定されたnamespaceのベクトルを取得"""
         try:
-            # 空のクエリで全ベクトルを取得
-            results = self.index.query(
-                vector=[0] * 1536,  # ダミーベクトル（次元数はモデルに依存）
-                top_k=limit,
-                include_metadata=True,
+            # インデックスの統計情報を取得
+            stats = self.index.describe_index_stats()
+            
+            # 指定されたnamespaceが存在しない場合は空のリストを返す
+            if namespace and namespace not in stats.namespaces:
+                return []
+            
+            # 指定されたnamespaceからベクトルを取得
+            results = self.index.fetch(
+                ids=[],  # 空のリストを渡すと全ベクトルを取得
                 namespace=namespace
             )
-            return results.matches
+            
+            # 結果を制限
+            vectors = list(results.vectors.values())[:limit] if results.vectors else []
+            
+            return vectors
         except Exception as e:
             raise Exception(f"ベクトルの取得に失敗しました: {str(e)}")
 
