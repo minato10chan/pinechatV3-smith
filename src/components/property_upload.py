@@ -43,15 +43,48 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
     paragraphs = [p.strip() for p in details.split('\n') if p.strip()]
     print(f"段落数: {len(paragraphs)}")
     
+    # 段落をさらに細かく分割
+    split_paragraphs = []
+    for paragraph in paragraphs:
+        # 段落のトークン数を計算
+        paragraph_tokens = len(encoding.encode(paragraph))
+        print(f"段落のトークン数: {paragraph_tokens}")
+        
+        if paragraph_tokens <= max_tokens:
+            split_paragraphs.append(paragraph)
+        else:
+            # 段落を文で分割
+            sentences = [s.strip() for s in paragraph.replace('。', '。\n').split('\n') if s.strip()]
+            current_sentence_group = []
+            current_group_tokens = 0
+            
+            for sentence in sentences:
+                sentence_tokens = len(encoding.encode(sentence))
+                print(f"文のトークン数: {sentence_tokens}")
+                
+                if current_group_tokens + sentence_tokens > max_tokens:
+                    if current_sentence_group:
+                        split_paragraphs.append(''.join(current_sentence_group))
+                    current_sentence_group = [sentence]
+                    current_group_tokens = sentence_tokens
+                else:
+                    current_sentence_group.append(sentence)
+                    current_group_tokens += sentence_tokens
+            
+            if current_sentence_group:
+                split_paragraphs.append(''.join(current_sentence_group))
+    
+    print(f"分割後の段落数: {len(split_paragraphs)}")
+    
     # 段落を意味のある単位でグループ化
     chunks = []
     current_chunk = []
     current_length = 0
     
-    for i, paragraph in enumerate(paragraphs):
+    for i, paragraph in enumerate(split_paragraphs):
         # 段落のトークン数を計算
         paragraph_tokens = len(encoding.encode(paragraph))
-        print(f"段落 {i+1}/{len(paragraphs)} のトークン数: {paragraph_tokens}")
+        print(f"段落 {i+1}/{len(split_paragraphs)} のトークン数: {paragraph_tokens}")
         
         # 現在のチャンクに追加した場合の長さを計算
         if current_chunk:
@@ -75,54 +108,11 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
                 chunk_tokens = len(encoding.encode(chunk_text))
                 print(f"チャンク {len(chunks) + 1} のトークン数: {chunk_tokens}")
                 
-                if chunk_tokens > max_tokens:
-                    # チャンクが大きすぎる場合は、さらに小さく分割
-                    sub_chunks = []
-                    current_sub_chunk = []
-                    current_sub_length = 0
-                    
-                    for j, p in enumerate(current_chunk):
-                        p_tokens = len(encoding.encode(p))
-                        print(f"サブチャンク分割 - 段落 {j+1}/{len(current_chunk)} のトークン数: {p_tokens}")
-                        
-                        if current_sub_length + p_tokens > max_tokens // 2:
-                            if current_sub_chunk:
-                                sub_chunks.append(current_sub_chunk)
-                            current_sub_chunk = [p]
-                            current_sub_length = p_tokens
-                        else:
-                            current_sub_chunk.append(p)
-                            current_sub_length += p_tokens
-                    
-                    if current_sub_chunk:
-                        sub_chunks.append(current_sub_chunk)
-                    
-                    print(f"サブチャンク数: {len(sub_chunks)}")
-                    
-                    # サブチャンクごとにチャンクを作成
-                    for j, sub_group in enumerate(sub_chunks):
-                        sub_chunk_info = base_info.copy()
-                        sub_chunk_info["property_details"] = "\n".join(sub_group)
-                        sub_chunk_info["chunk_number"] = len(chunks) + 1
-                        sub_chunk_info["sub_chunk_number"] = j + 1
-                        sub_chunk_info["total_sub_chunks"] = len(sub_chunks)
-                        
-                        # サブチャンクのトークン数を確認
-                        sub_chunk_text = json.dumps(sub_chunk_info, ensure_ascii=False)
-                        sub_chunk_tokens = len(encoding.encode(sub_chunk_text))
-                        print(f"サブチャンク {j+1}/{len(sub_chunks)} のトークン数: {sub_chunk_tokens}")
-                        
-                        chunk = {
-                            "text": sub_chunk_text,
-                            "metadata": sub_chunk_info
-                        }
-                        chunks.append(chunk)
-                else:
-                    chunk = {
-                        "text": chunk_text,
-                        "metadata": chunk_info
-                    }
-                    chunks.append(chunk)
+                chunk = {
+                    "text": chunk_text,
+                    "metadata": chunk_info
+                }
+                chunks.append(chunk)
             
             # 新しいチャンクを開始
             current_chunk = [paragraph]
@@ -142,54 +132,11 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
         chunk_tokens = len(encoding.encode(chunk_text))
         print(f"最後のチャンクのトークン数: {chunk_tokens}")
         
-        if chunk_tokens > max_tokens:
-            # チャンクが大きすぎる場合は、さらに小さく分割
-            sub_chunks = []
-            current_sub_chunk = []
-            current_sub_length = 0
-            
-            for j, p in enumerate(current_chunk):
-                p_tokens = len(encoding.encode(p))
-                print(f"最後のチャンク - サブチャンク分割 - 段落 {j+1}/{len(current_chunk)} のトークン数: {p_tokens}")
-                
-                if current_sub_length + p_tokens > max_tokens // 2:
-                    if current_sub_chunk:
-                        sub_chunks.append(current_sub_chunk)
-                    current_sub_chunk = [p]
-                    current_sub_length = p_tokens
-                else:
-                    current_sub_chunk.append(p)
-                    current_sub_length += p_tokens
-            
-            if current_sub_chunk:
-                sub_chunks.append(current_sub_chunk)
-            
-            print(f"最後のチャンクのサブチャンク数: {len(sub_chunks)}")
-            
-            # サブチャンクごとにチャンクを作成
-            for j, sub_group in enumerate(sub_chunks):
-                sub_chunk_info = base_info.copy()
-                sub_chunk_info["property_details"] = "\n".join(sub_group)
-                sub_chunk_info["chunk_number"] = len(chunks) + 1
-                sub_chunk_info["sub_chunk_number"] = j + 1
-                sub_chunk_info["total_sub_chunks"] = len(sub_chunks)
-                
-                # サブチャンクのトークン数を確認
-                sub_chunk_text = json.dumps(sub_chunk_info, ensure_ascii=False)
-                sub_chunk_tokens = len(encoding.encode(sub_chunk_text))
-                print(f"最後のチャンク - サブチャンク {j+1}/{len(sub_chunks)} のトークン数: {sub_chunk_tokens}")
-                
-                chunk = {
-                    "text": sub_chunk_text,
-                    "metadata": sub_chunk_info
-                }
-                chunks.append(chunk)
-        else:
-            chunk = {
-                "text": chunk_text,
-                "metadata": chunk_info
-            }
-            chunks.append(chunk)
+        chunk = {
+            "text": chunk_text,
+            "metadata": chunk_info
+        }
+        chunks.append(chunk)
     
     # 総チャンク数を更新
     for chunk in chunks:
