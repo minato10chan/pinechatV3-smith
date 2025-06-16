@@ -111,8 +111,8 @@ class LangChainService:
             # クエリのベクトル化
             query_vector = self.embeddings.embed_query(query)
             
-            # より多くの結果を取得して、後でフィルタリング
-            docs = self.vectorstore.similarity_search_with_score(query, k=top_k * 2)
+            # 検索を実行
+            docs = self.vectorstore.similarity_search_with_score(query, k=top_k)
             
             # メタデータを簡略化して保持
             simplified_docs = []
@@ -137,17 +137,19 @@ class LangChainService:
                 }
                 simplified_docs.append(simplified_doc)
             
-            # スコアでフィルタリング
-            filtered_docs = []
-            for doc in simplified_docs:
-                if doc["score"] >= SIMILARITY_THRESHOLD:
-                    filtered_docs.append(doc)
-                    if len(filtered_docs) >= top_k:
-                        break
+            # スコアでフィルタリング（しきい値未満は除外）
+            filtered_docs = [
+                doc for doc in simplified_docs
+                if doc["score"] >= SIMILARITY_THRESHOLD
+            ]
             
-            # フィルタリング後の結果が0件の場合は、スコアに関係なく上位K件を使用
-            if not filtered_docs and simplified_docs:
-                filtered_docs = simplified_docs[:top_k]
+            print(f"しきい値以上の候補数: {len(filtered_docs)}")
+            if filtered_docs:
+                print("採用された候補のスコア:")
+                for doc in filtered_docs:
+                    print(f"スコア: {doc['score']:.3f}, テキスト: {doc['content'][:100]}...")
+            else:
+                print("しきい値以上の候補が見つかりませんでした。")
             
             # コンテキストテキストを作成（メタデータを含めない）
             context_text = "\n".join([doc["content"] for doc in filtered_docs])

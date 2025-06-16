@@ -204,16 +204,16 @@ class PineconeService:
         
         for attempt in range(max_retries):
             try:
-                # より多くの候補を取得
+                # クエリのベクトル化
                 query_vector = self.get_embedding(query_text)
                 print(f"検索クエリ: {query_text}")
                 print(f"類似度しきい値: {similarity_threshold}")
-                print(f"取得する候補数: {top_k * 2}")
+                print(f"取得する候補数: {top_k}")
                 
-                # より多くの候補を取得（フィルタリング用）
+                # 検索を実行
                 results = self.index.query(
                     vector=query_vector,
-                    top_k=top_k * 2,  # フィルタリング用に2倍取得
+                    top_k=top_k,  # 必要な数だけ取得
                     include_metadata=True,
                     namespace=namespace  # namespaceを指定
                 )
@@ -224,20 +224,19 @@ class PineconeService:
                     for match in results.matches:
                         print(f"スコア: {match.score:.3f}")
                 
-                # 類似度でフィルタリング
+                # 類似度でフィルタリング（しきい値未満は除外）
                 filtered_matches = [
                     match for match in results.matches
                     if match.score >= similarity_threshold
                 ]
                 
-                print(f"フィルタリング後の候補数: {len(filtered_matches)}")
-                
-                # 上位K件に制限
-                filtered_matches = filtered_matches[:top_k]
-                
-                print(f"最終的な検索結果数: {len(filtered_matches)}")
-                for match in filtered_matches:
-                    print(f"スコア: {match.score:.3f}, テキスト: {match.metadata['text'][:100]}...")
+                print(f"しきい値以上の候補数: {len(filtered_matches)}")
+                if filtered_matches:
+                    print("採用された候補のスコア:")
+                    for match in filtered_matches:
+                        print(f"スコア: {match.score:.3f}, テキスト: {match.metadata['text'][:100]}...")
+                else:
+                    print("しきい値以上の候補が見つかりませんでした。")
                 
                 return {
                     "matches": filtered_matches,
