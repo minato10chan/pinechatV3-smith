@@ -34,7 +34,8 @@ class LangChainService:
         # 埋め込みモデルの初期化
         self.embeddings = OpenAIEmbeddings(
             api_key=OPENAI_API_KEY,
-            model="text-embedding-ada-002"
+            model="text-embedding-3-large",
+            dimensions=3072
         )
         
         # トークンカウンターの初期化

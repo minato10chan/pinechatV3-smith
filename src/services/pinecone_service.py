@@ -59,7 +59,7 @@ class PineconeService:
                         # インデックスが存在しない場合は作成
                         self.pc.create_index(
                             name=PINECONE_INDEX_NAME,
-                            dimension=1536,  # OpenAIの埋め込みモデルの次元数
+                            dimension=3072,  # text-embedding-3-largeの次元数
                             metric="cosine",
                             spec={
                                 "serverless": {
@@ -100,8 +100,9 @@ class PineconeService:
         for attempt in range(max_retries):
             try:
                 response = self.openai_client.embeddings.create(
-                    model=EMBEDDING_MODEL,
-                    input=text
+                    model="text-embedding-3-large",  # 新しいモデルを使用
+                    input=text,
+                    encoding_format="float"  # 明示的にfloat形式を指定
                 )
                 return response.data[0].embedding
             except Exception as e:
