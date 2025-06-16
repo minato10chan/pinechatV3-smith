@@ -101,6 +101,27 @@ def get_property_info(property_id: str, pinecone_service: PineconeService) -> st
     except Exception as e:
         return f"物件情報の取得中にエラーが発生しました: {str(e)}"
 
+def get_all_property_info(pinecone_service: PineconeService) -> str:
+    """すべての物件情報を取得して結合"""
+    try:
+        # Pineconeから物件情報の一覧を取得
+        results = pinecone_service.list_vectors(namespace="property")
+        
+        if not results:
+            return "物件情報が登録されていません。"
+            
+        # 物件情報を結合
+        all_properties = []
+        for match in results:
+            # テキストから物件情報を抽出
+            text = match.metadata["text"]
+            all_properties.append(text)
+            
+        # 物件情報を結合して返す
+        return "\n\n---\n\n".join(all_properties)
+    except Exception as e:
+        return f"物件情報の取得中にエラーが発生しました: {str(e)}"
+
 def render_chat(pinecone_service: PineconeService):
     """チャット機能のUIを表示"""
     st.title("チャット")
@@ -129,7 +150,7 @@ def render_chat(pinecone_service: PineconeService):
         if "langchain_service" in st.session_state:
             history_tokens = sum(st.session_state.langchain_service.count_tokens(msg.content) 
                                for msg in st.session_state.langchain_service.message_history.messages)
-            max_tokens = 12000  # LangChainServiceのoptimize_chat_historyと同じ値
+            max_tokens = 20000 # LangChainServiceのoptimize_chat_historyと同じ値
             optimization_status = "最適化済み" if history_tokens <= max_tokens else "最適化が必要"
             
             st.write(f"会話履歴の状態:")
@@ -158,31 +179,43 @@ def render_chat(pinecone_service: PineconeService):
         with template_tab2:
             st.text_area("応答テンプレート", value=selected_template_data["response_template"], disabled=True)
             
-        # 物件情報の選択
+        # 物件情報の表示
         st.header("物件情報")
-        properties = get_property_list(pinecone_service)
+        property_tab1, property_tab2 = st.tabs(["個別選択", "すべて表示"])
         
-        if properties:
-            # 物件の選択肢を作成（物件名と場所を表示）
-            property_options = [f"{p['name']} - {p['location']}" for p in properties]
-            selected_property = st.selectbox(
-                "物件を選択",
-                options=property_options,
-                index=0
-            )
+        with property_tab1:
+            properties = get_property_list(pinecone_service)
             
-            # 選択された物件のIDを取得
-            selected_property_id = properties[property_options.index(selected_property)]["id"]
+            if properties:
+                # 物件の選択肢を作成（物件名と場所を表示）
+                property_options = [f"{p['name']} - {p['location']}" for p in properties]
+                selected_property = st.selectbox(
+                    "物件を選択",
+                    options=property_options,
+                    index=0
+                )
+                
+                # 選択された物件のIDを取得
+                selected_property_id = properties[property_options.index(selected_property)]["id"]
+                
+                # 選択された物件の詳細情報を取得
+                st.session_state.property_info = get_property_info(selected_property_id, pinecone_service)
+                
+                # 物件の詳細情報を表示
+                st.subheader("選択中の物件情報")
+                st.markdown(st.session_state.property_info)
+            else:
+                st.warning("物件情報が登録されていません。")
+                st.session_state.property_info = "物件情報が登録されていません。"
+        
+        with property_tab2:
+            # すべての物件情報を取得
+            all_property_info = get_all_property_info(pinecone_service)
+            st.session_state.property_info = all_property_info
             
-            # 選択された物件の詳細情報を取得
-            st.session_state.property_info = get_property_info(selected_property_id, pinecone_service)
-            
-            # 物件の詳細情報を表示
-            st.subheader("選択中の物件情報")
-            st.markdown(st.session_state.property_info)
-        else:
-            st.warning("物件情報が登録されていません。")
-            st.session_state.property_info = "物件情報が登録されていません。"
+            # 物件情報を表示
+            st.subheader("すべての物件情報")
+            st.markdown(all_property_info)
         
         # 履歴の保存 (ローカルダウンロード)
         st.write(f"現在のメッセージ数: {len(st.session_state.messages)}")
