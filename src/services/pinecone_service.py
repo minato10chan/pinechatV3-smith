@@ -48,56 +48,34 @@ class PineconeService:
         
         for attempt in range(max_retries):
             try:
+                # インデックス名の確認
+                if not PINECONE_INDEX_NAME:
+                    raise ValueError("インデックス名が設定されていません。Streamlit Cloudのシークレットを確認してください。")
+                print(f"使用するインデックス名: {PINECONE_INDEX_NAME}")
+                
                 # インデックスの存在確認
                 existing_indexes = self.pc.list_indexes()
                 existing_index_names = [index["name"] for index in existing_indexes]
-                print(f"既存のインデックス: {existing_indexes}")
+                print(f"既存のインデックス: {existing_index_names}")
                 
                 if PINECONE_INDEX_NAME not in existing_index_names:
-                    print(f"インデックス '{PINECONE_INDEX_NAME}' が存在しないため、新規作成します")
-                    try:
-                        # インデックスが存在しない場合は作成
-                        self.pc.create_index(
-                            name=PINECONE_INDEX_NAME,
-                            dimension=3072,  # text-embedding-3-largeの次元数
-                            metric="cosine",
-                            spec={
-                                "serverless": {
-                                    "cloud": "aws",
-                                    "region": "us-east-1"
-                                }
-                            }
-                        )
-                        print(f"インデックス '{PINECONE_INDEX_NAME}' の作成を開始しました")
-                        # インデックスの作成完了を待機
-                        time.sleep(10)
-                    except Exception as create_error:
-                        if "ALREADY_EXISTS" in str(create_error):
-                            print(f"インデックス '{PINECONE_INDEX_NAME}' は既に存在します")
-                        else:
-                            raise create_error
-                else:
-                    print(f"インデックス '{PINECONE_INDEX_NAME}' は既に存在します")
-                    # 既存のインデックスを削除して再作成
-                    print(f"既存のインデックスを削除して再作成します")
-                    self.pc.delete_index(PINECONE_INDEX_NAME)
-                    time.sleep(5)  # 削除完了を待機
-                    self.pc.create_index(
-                        name=PINECONE_INDEX_NAME,
-                        dimension=3072,
-                        metric="cosine",
-                        spec={
-                            "serverless": {
-                                "cloud": "aws",
-                                "region": "us-east-1"
-                            }
-                        }
-                    )
-                    print(f"インデックス '{PINECONE_INDEX_NAME}' を再作成しました")
-                    time.sleep(10)  # 作成完了を待機
+                    raise ValueError(f"インデックス '{PINECONE_INDEX_NAME}' が見つかりません。Streamlit Cloudのシークレットを確認してください。")
+                
+                # 既存のインデックスの設定を確認
+                index = self.pc.Index(PINECONE_INDEX_NAME)
+                stats = index.describe_index_stats()
+                print(f"現在のインデックス設定:")
+                print(f"- 次元数: {stats.dimension}")
+                print(f"- メトリック: {stats.metric}")
+                print(f"- ベクトル数: {stats.total_vector_count}")
+                
+                # 次元数が3072でない場合は警告を表示
+                if stats.dimension != 3072:
+                    print(f"警告: インデックスの次元数が3072と異なります（現在: {stats.dimension}）")
+                    print("新しい埋め込みモデル（text-embedding-3-large）との互換性に問題が発生する可能性があります")
                 
                 # インデックスの取得
-                self.index = self.pc.Index(PINECONE_INDEX_NAME)
+                self.index = index
                 break
                 
             except Exception as e:
