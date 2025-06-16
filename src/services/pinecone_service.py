@@ -291,21 +291,29 @@ class PineconeService:
     def get_index_data(self) -> List[Dict]:
         """インデックスのデータを取得"""
         try:
-            # ダミーベクトルを作成（3072次元のゼロベクトル）
-            dummy_vector = [0.0] * 3072
+            # インデックスの統計情報を取得
+            stats = self.index.describe_index_stats()
             
-            # デフォルトnamespaceのデータを取得
-            results = self.index.query(
-                vector=dummy_vector,  # ダミーベクトルを指定
-                top_k=1000,
-                include_metadata=True,
-                namespace=""
-            )
+            # インデックスが空の場合は空のリストを返す
+            if stats.total_vector_count == 0:
+                return []
             
+            # 全ベクトルのIDを取得
+            all_vectors = []
+            for namespace in stats.namespaces:
+                # 各namespaceからベクトルを取得
+                results = self.index.fetch(
+                    ids=[],  # 空のリストを渡すと全ベクトルを取得
+                    namespace=namespace
+                )
+                if results.vectors:
+                    all_vectors.extend(results.vectors.values())
+            
+            # メタデータを抽出
             data = []
-            for match in results.matches:
-                if 'metadata' in match:
-                    metadata = match.metadata
+            for vector in all_vectors:
+                if 'metadata' in vector:
+                    metadata = vector.metadata
                     # 必要なメタデータを抽出
                     item = {
                         'filename': metadata.get('filename', ''),
