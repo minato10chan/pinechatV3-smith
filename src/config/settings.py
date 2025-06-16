@@ -28,8 +28,8 @@ EMBEDDING_MODEL = "text-embedding-3-large"  # 使用する埋め込みモデル
 EMBEDDING_DIMENSION = 3072  # 埋め込みベクトルの次元数
 
 # Search Settings
-DEFAULT_TOP_K = 10  # デフォルトの検索結果数
-SIMILARITY_THRESHOLD = 0.7  # 類似度のしきい値（0-1の範囲）
+DEFAULT_TOP_K = 5 # デフォルトの検索結果数
+SIMILARITY_THRESHOLD = 0.45　# 類似度のしきい値（0-1の範囲）
 
 # Metadata Settings
 DEFAULT_CREATION_DATE = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # メタデータの作成日が空の場合のデフォルト値
