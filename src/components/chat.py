@@ -341,11 +341,11 @@ def render_chat(pinecone_service: PineconeService):
             chat_history.reverse()
             
             response, details = st.session_state.langchain_service.get_response(
-                prompt,
+                query=prompt,
                 system_prompt=selected_template_data["system_prompt"],
                 response_template=selected_template_data["response_template"],
                 property_info=st.session_state.get("property_info", "物件情報はありません。"),
-                chat_history=chat_history,  # 会話履歴を渡す
+                chat_history=chat_history,
                 similarity_threshold=st.session_state.get("similarity_threshold", 0.7)
             )
             
