@@ -262,9 +262,13 @@ class PineconeService:
         for attempt in range(max_retries):
             try:
                 stats = self.index.describe_index_stats()
+                # 辞書形式で返す
                 return {
                     "total_vector_count": stats.total_vector_count,
-                    "namespaces": stats.namespaces
+                    "namespaces": stats.namespaces,
+                    "dimension": stats.dimension,
+                    "index_fullness": stats.index_fullness,
+                    "metric": stats.metric
                 }
             except Exception as e:
                 if attempt < max_retries - 1:

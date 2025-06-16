@@ -1,4 +1,4 @@
-import streamlit as st
+ｃ２port streamlit as st
 from src.services.pinecone_service import PineconeService
 import pandas as pd
 import json
