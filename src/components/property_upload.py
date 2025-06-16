@@ -19,7 +19,7 @@ CITIES = {
     # 他の都道府県の市区町村も同様に追加可能
 }
 
-def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
+def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
     """物件データを複数のチャンクに分割する"""
     encoding = tiktoken.encoding_for_model("text-embedding-3-large")
     
@@ -41,15 +41,17 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
     
     # 詳細情報を段落で分割
     paragraphs = [p.strip() for p in details.split('\n') if p.strip()]
+    print(f"段落数: {len(paragraphs)}")
     
     # 段落を意味のある単位でグループ化
     chunks = []
     current_chunk = []
     current_length = 0
     
-    for paragraph in paragraphs:
+    for i, paragraph in enumerate(paragraphs):
         # 段落のトークン数を計算
         paragraph_tokens = len(encoding.encode(paragraph))
+        print(f"段落 {i+1}/{len(paragraphs)} のトークン数: {paragraph_tokens}")
         
         # 現在のチャンクに追加した場合の長さを計算
         if current_chunk:
@@ -58,6 +60,7 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
             test_text = paragraph
         
         test_tokens = len(encoding.encode(test_text))
+        print(f"現在のチャンク + 段落のトークン数: {test_tokens}")
         
         # チャンクの長さが制限を超える場合、新しいチャンクを開始
         if test_tokens > max_tokens:
@@ -70,6 +73,7 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
                 # チャンクのトークン数を確認
                 chunk_text = json.dumps(chunk_info, ensure_ascii=False)
                 chunk_tokens = len(encoding.encode(chunk_text))
+                print(f"チャンク {len(chunks) + 1} のトークン数: {chunk_tokens}")
                 
                 if chunk_tokens > max_tokens:
                     # チャンクが大きすぎる場合は、さらに小さく分割
@@ -77,8 +81,10 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
                     current_sub_chunk = []
                     current_sub_length = 0
                     
-                    for p in current_chunk:
+                    for j, p in enumerate(current_chunk):
                         p_tokens = len(encoding.encode(p))
+                        print(f"サブチャンク分割 - 段落 {j+1}/{len(current_chunk)} のトークン数: {p_tokens}")
+                        
                         if current_sub_length + p_tokens > max_tokens // 2:
                             if current_sub_chunk:
                                 sub_chunks.append(current_sub_chunk)
@@ -91,6 +97,8 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
                     if current_sub_chunk:
                         sub_chunks.append(current_sub_chunk)
                     
+                    print(f"サブチャンク数: {len(sub_chunks)}")
+                    
                     # サブチャンクごとにチャンクを作成
                     for j, sub_group in enumerate(sub_chunks):
                         sub_chunk_info = base_info.copy()
@@ -99,8 +107,13 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
                         sub_chunk_info["sub_chunk_number"] = j + 1
                         sub_chunk_info["total_sub_chunks"] = len(sub_chunks)
                         
+                        # サブチャンクのトークン数を確認
+                        sub_chunk_text = json.dumps(sub_chunk_info, ensure_ascii=False)
+                        sub_chunk_tokens = len(encoding.encode(sub_chunk_text))
+                        print(f"サブチャンク {j+1}/{len(sub_chunks)} のトークン数: {sub_chunk_tokens}")
+                        
                         chunk = {
-                            "text": json.dumps(sub_chunk_info, ensure_ascii=False),
+                            "text": sub_chunk_text,
                             "metadata": sub_chunk_info
                         }
                         chunks.append(chunk)
@@ -127,6 +140,7 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
         # チャンクのトークン数を確認
         chunk_text = json.dumps(chunk_info, ensure_ascii=False)
         chunk_tokens = len(encoding.encode(chunk_text))
+        print(f"最後のチャンクのトークン数: {chunk_tokens}")
         
         if chunk_tokens > max_tokens:
             # チャンクが大きすぎる場合は、さらに小さく分割
@@ -134,8 +148,10 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
             current_sub_chunk = []
             current_sub_length = 0
             
-            for p in current_chunk:
+            for j, p in enumerate(current_chunk):
                 p_tokens = len(encoding.encode(p))
+                print(f"最後のチャンク - サブチャンク分割 - 段落 {j+1}/{len(current_chunk)} のトークン数: {p_tokens}")
+                
                 if current_sub_length + p_tokens > max_tokens // 2:
                     if current_sub_chunk:
                         sub_chunks.append(current_sub_chunk)
@@ -148,6 +164,8 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
             if current_sub_chunk:
                 sub_chunks.append(current_sub_chunk)
             
+            print(f"最後のチャンクのサブチャンク数: {len(sub_chunks)}")
+            
             # サブチャンクごとにチャンクを作成
             for j, sub_group in enumerate(sub_chunks):
                 sub_chunk_info = base_info.copy()
@@ -156,8 +174,13 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
                 sub_chunk_info["sub_chunk_number"] = j + 1
                 sub_chunk_info["total_sub_chunks"] = len(sub_chunks)
                 
+                # サブチャンクのトークン数を確認
+                sub_chunk_text = json.dumps(sub_chunk_info, ensure_ascii=False)
+                sub_chunk_tokens = len(encoding.encode(sub_chunk_text))
+                print(f"最後のチャンク - サブチャンク {j+1}/{len(sub_chunks)} のトークン数: {sub_chunk_tokens}")
+                
                 chunk = {
-                    "text": json.dumps(sub_chunk_info, ensure_ascii=False),
+                    "text": sub_chunk_text,
                     "metadata": sub_chunk_info
                 }
                 chunks.append(chunk)
@@ -172,6 +195,7 @@ def split_property_data(property_data: dict, max_tokens: int = 3000) -> list:
     for chunk in chunks:
         chunk["metadata"]["total_chunks"] = len(chunks)
     
+    print(f"最終的なチャンク数: {len(chunks)}")
     return chunks
 
 def render_property_upload(pinecone_service: PineconeService):
