@@ -12,6 +12,7 @@ from ..config.settings import (
     SIMILARITY_THRESHOLD
 )
 import json
+import streamlit as st
 
 class PineconeService:
     def __init__(self):
@@ -202,6 +203,10 @@ class PineconeService:
         max_retries = 3
         retry_delay = 1
         
+        # 設定画面で変更された値を取得（引数で渡された値が優先）
+        if similarity_threshold == SIMILARITY_THRESHOLD:  # デフォルト値が使用されている場合
+            similarity_threshold = st.session_state.get("similarity_threshold", SIMILARITY_THRESHOLD)
+        
         for attempt in range(max_retries):
             try:
                 # クエリのベクトル化
@@ -230,7 +235,7 @@ class PineconeService:
                     if match.score >= similarity_threshold
                 ]
                 
-                print(f"しきい値以上の候補数: {len(filtered_matches)}")
+                print(f"しきい値({similarity_threshold})以上の候補数: {len(filtered_matches)}")
                 if filtered_matches:
                     print("採用された候補のスコア:")
                     for match in filtered_matches:

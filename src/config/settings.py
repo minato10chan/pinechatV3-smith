@@ -29,7 +29,7 @@ EMBEDDING_DIMENSION = 3072  # 埋め込みベクトルの次元数
 
 # Search Settings
 DEFAULT_TOP_K = 10  # デフォルトの検索結果数
-SIMILARITY_THRESHOLD = 0.7  # 類似度のしきい値（0-1の範囲）
+SIMILARITY_THRESHOLD = 0.4  # 類似度のしきい値（0-1の範囲）
 
 # Metadata Settings
 DEFAULT_CREATION_DATE = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # メタデータの作成日が空の場合のデフォルト値
