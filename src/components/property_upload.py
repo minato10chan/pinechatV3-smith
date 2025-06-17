@@ -5,6 +5,7 @@ import json
 import traceback
 from datetime import datetime
 import tiktoken
+from src.config.settings import PROPERTY_MAX_TOKENS
 
 # 都道府県と市区町村のデータ
 PREFECTURES = [
@@ -19,7 +20,7 @@ CITIES = {
     # 他の都道府県の市区町村も同様に追加可能
 }
 
-def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
+def split_property_data(property_data: dict, max_tokens: int = PROPERTY_MAX_TOKENS) -> list:
     """物件データを複数のチャンクに分割する"""
     encoding = tiktoken.encoding_for_model("text-embedding-3-large")
     
@@ -41,14 +42,11 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
     
     # 詳細情報を段落で分割
     paragraphs = [p.strip() for p in details.split('\n') if p.strip()]
-    print(f"段落数: {len(paragraphs)}")
     
     # 段落をさらに細かく分割
     split_paragraphs = []
     for paragraph in paragraphs:
-        # 段落のトークン数を計算
         paragraph_tokens = len(encoding.encode(paragraph))
-        print(f"段落のトークン数: {paragraph_tokens}")
         
         if paragraph_tokens <= max_tokens:
             split_paragraphs.append(paragraph)
@@ -60,7 +58,6 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
             
             for sentence in sentences:
                 sentence_tokens = len(encoding.encode(sentence))
-                print(f"文のトークン数: {sentence_tokens}")
                 
                 if current_group_tokens + sentence_tokens > max_tokens:
                     if current_sentence_group:
@@ -74,18 +71,11 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
             if current_sentence_group:
                 split_paragraphs.append(''.join(current_sentence_group))
     
-    print(f"分割後の段落数: {len(split_paragraphs)}")
-    
     # 段落を意味のある単位でグループ化
     chunks = []
     current_chunk = []
-    current_length = 0
     
-    for i, paragraph in enumerate(split_paragraphs):
-        # 段落のトークン数を計算
-        paragraph_tokens = len(encoding.encode(paragraph))
-        print(f"段落 {i+1}/{len(split_paragraphs)} のトークン数: {paragraph_tokens}")
-        
+    for paragraph in split_paragraphs:
         # 現在のチャンクに追加した場合の長さを計算
         if current_chunk:
             test_text = "\n".join(current_chunk + [paragraph])
@@ -93,7 +83,6 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
             test_text = paragraph
         
         test_tokens = len(encoding.encode(test_text))
-        print(f"現在のチャンク + 段落のトークン数: {test_tokens}")
         
         # チャンクの長さが制限を超える場合、新しいチャンクを開始
         if test_tokens > max_tokens:
@@ -103,11 +92,7 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
                 chunk_info["property_details"] = "\n".join(current_chunk)
                 chunk_info["chunk_number"] = len(chunks) + 1
                 
-                # チャンクのトークン数を確認
                 chunk_text = json.dumps(chunk_info, ensure_ascii=False)
-                chunk_tokens = len(encoding.encode(chunk_text))
-                print(f"チャンク {len(chunks) + 1} のトークン数: {chunk_tokens}")
-                
                 chunk = {
                     "text": chunk_text,
                     "metadata": chunk_info
@@ -116,10 +101,8 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
             
             # 新しいチャンクを開始
             current_chunk = [paragraph]
-            current_length = paragraph_tokens
         else:
             current_chunk.append(paragraph)
-            current_length = test_tokens
     
     # 最後のチャンクを処理
     if current_chunk:
@@ -127,11 +110,7 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
         chunk_info["property_details"] = "\n".join(current_chunk)
         chunk_info["chunk_number"] = len(chunks) + 1
         
-        # チャンクのトークン数を確認
         chunk_text = json.dumps(chunk_info, ensure_ascii=False)
-        chunk_tokens = len(encoding.encode(chunk_text))
-        print(f"最後のチャンクのトークン数: {chunk_tokens}")
-        
         chunk = {
             "text": chunk_text,
             "metadata": chunk_info
@@ -142,7 +121,6 @@ def split_property_data(property_data: dict, max_tokens: int = 2000) -> list:
     for chunk in chunks:
         chunk["metadata"]["total_chunks"] = len(chunks)
     
-    print(f"最終的なチャンク数: {len(chunks)}")
     return chunks
 
 def render_property_upload(pinecone_service: PineconeService):
@@ -242,4 +220,4 @@ def render_property_upload(pinecone_service: PineconeService):
             except Exception as e:
                 st.error(f"❌ アップロードに失敗しました: {str(e)}")
                 st.error(f"🔍 エラーの詳細: {type(e).__name__}")
-                st.error(f"📜 スタックトレース:\n{traceback.format_exc()}") 
+                st.error(f"📜 スタックトレース:\n{traceback.format_exc()}")   
