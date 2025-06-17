@@ -158,7 +158,11 @@ class LangChainService:
                 print("しきい値以上の候補が見つかりませんでした。")
             
             # コンテキストテキストを作成（メタデータを含めない）
-            context_text = "\n".join([doc["content"] for doc in filtered_docs])
+            if filtered_docs:
+                context_text = "\n".join([doc["content"] for doc in filtered_docs])
+            else:
+                # 関連情報が見つからない場合は空文字列を返す
+                context_text = ""
             
             # コンテキストのトークン数をカウント
             context_tokens = self.count_tokens(context_text)
@@ -227,6 +231,12 @@ class LangChainService:
             
             # 関連する文脈を取得
             context, search_details, context_tokens = self.get_relevant_context(query)
+            
+            # 参照文脈が空の場合の処理
+            if not context.strip():
+                # 参照文脈が空の場合は、AIに明確な指示を与える
+                context = "【重要】参照文脈に情報がありません。この場合、絶対に推測や一般的な知識で回答せず、情報がないことを明確に伝えてください。"
+                print("⚠️ 参照文脈が空のため、情報がないことを明確に伝えるよう指示します")
             
             # チャット履歴を設定
             if chat_history:
