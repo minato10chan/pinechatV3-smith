@@ -16,6 +16,7 @@ from ..config.settings import (
     DEFAULT_SYSTEM_PROMPT,
     DEFAULT_RESPONSE_TEMPLATE
 )
+import streamlit as st
 
 class LangChainService:
     def __init__(self, callback_manager=None):
@@ -104,9 +105,13 @@ class LangChainService:
     def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K) -> Tuple[str, List[Dict[str, Any]], int]:
         """クエリに関連する文脈を取得"""
         try:
+            # 設定画面で変更されたしきい値を取得（デフォルトはSIMILARITY_THRESHOLD）
+            similarity_threshold = st.session_state.get("similarity_threshold", SIMILARITY_THRESHOLD)
+            
             # クエリのトークン数をカウント
             query_tokens = self.count_tokens(query)
             print(f"クエリのトークン数: {query_tokens}")
+            print(f"使用する類似度しきい値: {similarity_threshold}")
             
             # クエリのベクトル化
             query_vector = self.embeddings.embed_query(query)
@@ -140,10 +145,11 @@ class LangChainService:
             # スコアでフィルタリング（しきい値未満は除外）
             filtered_docs = [
                 doc for doc in simplified_docs
-                if doc["score"] >= SIMILARITY_THRESHOLD
+                if doc["score"] >= similarity_threshold
             ]
             
-            print(f"しきい値以上の候補数: {len(filtered_docs)}")
+            print(f"取得した候補数: {len(simplified_docs)}")
+            print(f"しきい値({similarity_threshold})以上の候補数: {len(filtered_docs)}")
             if filtered_docs:
                 print("採用された候補のスコア:")
                 for doc in filtered_docs:
