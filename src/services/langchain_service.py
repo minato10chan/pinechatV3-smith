@@ -17,6 +17,7 @@ from ..config.settings import (
     DEFAULT_RESPONSE_TEMPLATE
 )
 import streamlit as st
+from .advanced_search_service import AdvancedSearchService
 
 class LangChainService:
     def __init__(self, callback_manager=None):
@@ -57,6 +58,14 @@ class LangChainService:
         # デフォルトのプロンプトテンプレート
         self.system_prompt = DEFAULT_SYSTEM_PROMPT
         self.response_template = DEFAULT_RESPONSE_TEMPLATE
+        
+        # 高度な検索サービスの初期化
+        from .pinecone_service import PineconeService
+        pinecone_service = PineconeService()
+        self.advanced_search = AdvancedSearchService(pinecone_service)
+        
+        # 検索モードの設定（デフォルトは高度な検索）
+        self.use_advanced_search = True
 
     def check_api_usage(self):
         """OpenAI APIの使用状況を確認"""
@@ -103,85 +112,14 @@ class LangChainService:
         return len(self.encoding.encode(text))
 
     def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K) -> Tuple[str, List[Dict[str, Any]], int]:
-        """クエリに関連する文脈を取得"""
+        """クエリに関連する文脈を取得（高度な検索を使用）"""
         try:
-            # 設定画面で変更されたしきい値を取得（デフォルトはSIMILARITY_THRESHOLD）
-            similarity_threshold = st.session_state.get("similarity_threshold", SIMILARITY_THRESHOLD)
-            
-            # クエリのトークン数をカウント
-            query_tokens = self.count_tokens(query)
-            print(f"クエリのトークン数: {query_tokens}")
-            print(f"使用する類似度しきい値: {similarity_threshold}")
-            
-            # クエリのベクトル化
-            query_vector = self.embeddings.embed_query(query)
-            
-            # 検索を実行
-            docs = self.vectorstore.similarity_search_with_score(query, k=top_k)
-            
-            # メタデータを簡略化して保持
-            simplified_docs = []
-            for doc in docs:
-                # メタデータを簡略化
-                simplified_metadata = {}
-                for key, value in doc[0].metadata.items():
-                    if isinstance(value, str):
-                        # メタデータの値を短くする（最大100文字）
-                        simplified_metadata[key] = value[:100] + "..." if len(value) > 100 else value
-                
-                # テキストを短くする（最大500文字）
-                content = doc[0].page_content
-                if len(content) > 500:
-                    content = content[:500] + "..."
-                
-                # 簡略化したドキュメントを作成
-                simplified_doc = {
-                    "content": content,
-                    "metadata": simplified_metadata,
-                    "score": doc[1]
-                }
-                simplified_docs.append(simplified_doc)
-            
-            # スコアでフィルタリング（しきい値未満は除外）
-            filtered_docs = [
-                doc for doc in simplified_docs
-                if doc["score"] >= similarity_threshold
-            ]
-            
-            print(f"取得した候補数: {len(simplified_docs)}")
-            print(f"しきい値({similarity_threshold})以上の候補数: {len(filtered_docs)}")
-            if filtered_docs:
-                print("採用された候補のスコア:")
-                for doc in filtered_docs:
-                    print(f"スコア: {doc['score']:.3f}, テキスト: {doc['content'][:100]}...")
+            # 高度な検索を使用するかどうかを確認
+            if self.use_advanced_search:
+                return self._get_context_with_advanced_search(query, top_k)
             else:
-                print("しきい値以上の候補が見つかりませんでした。")
-            
-            # コンテキストテキストを作成（メタデータを含めない）
-            if filtered_docs:
-                context_text = "\n".join([doc["content"] for doc in filtered_docs])
-            else:
-                # 関連情報が見つからない場合は空文字列を返す
-                context_text = ""
-            
-            # コンテキストのトークン数をカウント
-            context_tokens = self.count_tokens(context_text)
-            print(f"コンテキストのトークン数: {context_tokens}")
-            
-            search_details = []
-            for doc in filtered_docs:
-                detail = {
-                    "スコア": round(doc["score"], 4),
-                    "テキスト": doc["content"][:100] + "...",
-                    "メタデータ": doc["metadata"],
-                    "ファイル名": doc["metadata"].get("source", "不明"),
-                    "ページ番号": doc["metadata"].get("page", "不明"),
-                    "セクション": doc["metadata"].get("section", "不明")
-                }
-                search_details.append(detail)
-            
-            return context_text, search_details, context_tokens
-            
+                return self._get_context_with_basic_search(query, top_k)
+                
         except Exception as e:
             error_message = str(e)
             if "insufficient_quota" in error_message:
@@ -201,6 +139,134 @@ class LangChainService:
                     "エラーメッセージ": error_message,
                     "エラータイプ": "Unknown Error"
                 }], 0
+
+    def _get_context_with_advanced_search(self, query: str, top_k: int) -> Tuple[str, List[Dict[str, Any]], int]:
+        """高度な検索を使用してコンテキストを取得"""
+        print(f"\n=== 高度な検索を使用 ===")
+        
+        # マルチステップ検索を実行
+        search_results = self.advanced_search.multi_step_search(query)
+        
+        # 検索分析情報を取得
+        analytics = self.advanced_search.get_search_analytics(search_results)
+        print(f"検索分析: {analytics}")
+        
+        # 結果を処理
+        matches = search_results.get("matches", [])
+        
+        if not matches:
+            return "", [], 0
+        
+        # コンテキストテキストを作成
+        context_text = "\n".join([match.metadata.get("text", "") for match in matches])
+        
+        # 検索詳細情報を作成
+        search_details = []
+        for match in matches:
+            detail = {
+                "スコア": round(getattr(match, 'adjusted_score', match.score), 4),
+                "元のスコア": round(match.score, 4),
+                "テキスト": match.metadata.get("text", "")[:100] + "...",
+                "メタデータ": match.metadata,
+                "ファイル名": match.metadata.get("source", "不明"),
+                "ページ番号": match.metadata.get("page", "不明"),
+                "セクション": match.metadata.get("section", "不明"),
+                "クエリバリエーション": getattr(match, 'query_variation', 'unknown'),
+                "クエリ順序": getattr(match, 'query_index', 0)
+            }
+            search_details.append(detail)
+        
+        # コンテキストのトークン数をカウント
+        context_tokens = self.count_tokens(context_text)
+        print(f"コンテキストのトークン数: {context_tokens}")
+        
+        return context_text, search_details, context_tokens
+
+    def _get_context_with_basic_search(self, query: str, top_k: int) -> Tuple[str, List[Dict[str, Any]], int]:
+        """基本的な検索を使用してコンテキストを取得（従来の方法）"""
+        print(f"\n=== 基本的な検索を使用 ===")
+        
+        # 設定画面で変更されたしきい値を取得（デフォルトはSIMILARITY_THRESHOLD）
+        similarity_threshold = st.session_state.get("similarity_threshold", SIMILARITY_THRESHOLD)
+        
+        # クエリのトークン数をカウント
+        query_tokens = self.count_tokens(query)
+        print(f"クエリのトークン数: {query_tokens}")
+        print(f"使用する類似度しきい値: {similarity_threshold}")
+        
+        # クエリのベクトル化
+        query_vector = self.embeddings.embed_query(query)
+        
+        # 検索を実行
+        docs = self.vectorstore.similarity_search_with_score(query, k=top_k)
+        
+        # メタデータを簡略化して保持
+        simplified_docs = []
+        for doc in docs:
+            # メタデータを簡略化
+            simplified_metadata = {}
+            for key, value in doc[0].metadata.items():
+                if isinstance(value, str):
+                    # メタデータの値を短くする（最大100文字）
+                    simplified_metadata[key] = value[:100] + "..." if len(value) > 100 else value
+            
+            # テキストを短くする（最大500文字）
+            content = doc[0].page_content
+            if len(content) > 500:
+                content = content[:500] + "..."
+            
+            # 簡略化したドキュメントを作成
+            simplified_doc = {
+                "content": content,
+                "metadata": simplified_metadata,
+                "score": doc[1]
+            }
+            simplified_docs.append(simplified_doc)
+        
+        # スコアでフィルタリング（しきい値未満は除外）
+        filtered_docs = [
+            doc for doc in simplified_docs
+            if doc["score"] >= similarity_threshold
+        ]
+        
+        print(f"取得した候補数: {len(simplified_docs)}")
+        print(f"しきい値({similarity_threshold})以上の候補数: {len(filtered_docs)}")
+        if filtered_docs:
+            print("採用された候補のスコア:")
+            for doc in filtered_docs:
+                print(f"スコア: {doc['score']:.3f}, テキスト: {doc['content'][:100]}...")
+        else:
+            print("しきい値以上の候補が見つかりませんでした。")
+        
+        # コンテキストテキストを作成（メタデータを含めない）
+        if filtered_docs:
+            context_text = "\n".join([doc["content"] for doc in filtered_docs])
+        else:
+            # 関連情報が見つからない場合は空文字列を返す
+            context_text = ""
+        
+        # コンテキストのトークン数をカウント
+        context_tokens = self.count_tokens(context_text)
+        print(f"コンテキストのトークン数: {context_tokens}")
+        
+        search_details = []
+        for doc in filtered_docs:
+            detail = {
+                "スコア": round(doc["score"], 4),
+                "テキスト": doc["content"][:100] + "...",
+                "メタデータ": doc["metadata"],
+                "ファイル名": doc["metadata"].get("source", "不明"),
+                "ページ番号": doc["metadata"].get("page", "不明"),
+                "セクション": doc["metadata"].get("section", "不明")
+            }
+            search_details.append(detail)
+        
+        return context_text, search_details, context_tokens
+
+    def set_search_mode(self, use_advanced: bool = True):
+        """検索モードを設定"""
+        self.use_advanced_search = use_advanced
+        print(f"検索モードを {'高度な検索' if use_advanced else '基本的な検索'} に設定しました")
 
     def get_response(self, query: str, system_prompt: str = None, response_template: str = None, property_info: str = None, chat_history: list = None) -> Tuple[str, Dict[str, Any]]:
         """クエリに対する応答を生成"""

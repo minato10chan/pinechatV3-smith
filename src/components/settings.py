@@ -66,7 +66,7 @@ def render_settings(pinecone_service: PineconeService):
             top_k = st.number_input(
                 "🔍 検索結果数",
                 min_value=1,
-                max_value=10,
+                max_value=20,
                 value=st.session_state.get("top_k", DEFAULT_TOP_K),
                 help="検索結果として返す最大件数。大きすぎると処理が遅くなります。"
             )
@@ -81,11 +81,34 @@ def render_settings(pinecone_service: PineconeService):
                 help="検索結果の類似度のしきい値。高いほど厳密な検索になります。"
             )
         
+        # 検索モードの選択
+        st.markdown("### 🔍 検索モード設定")
+        st.markdown("使用する検索方式を選択します。")
+        
+        search_mode = st.selectbox(
+            "検索モード",
+            options=[
+                ("advanced", "🚀 高度な検索（推奨）", "マルチステップ検索、クエリ拡張、動的しきい値調整"),
+                ("basic", "⚡ 基本的な検索", "従来の単純なベクトル検索")
+            ],
+            format_func=lambda x: x[1],
+            index=0 if st.session_state.get("search_mode", "advanced") == "advanced" else 1,
+            help="高度な検索はより精度の高い結果を提供しますが、処理時間が長くなります。"
+        )
+        
+        # 選択されたモードの説明を表示
+        selected_mode = search_mode[0]
+        if selected_mode == "advanced":
+            st.info("🚀 **高度な検索モード**\n\n- キーワード抽出とクエリ拡張\n- 複数のクエリバリエーションでの検索\n- メタデータフィルタリング\n- 動的しきい値調整\n- 結果の統合とランキング")
+        else:
+            st.info("⚡ **基本的な検索モード**\n\n- 従来の単純なベクトル検索\n- 高速な処理\n- シンプルな結果")
+        
         st.markdown("---")
         st.markdown("### 現在の設定値")
         st.json({
             "検索結果数": top_k,
-            "類似度しきい値": similarity_threshold
+            "類似度しきい値": similarity_threshold,
+            "検索モード": "高度な検索" if selected_mode == "advanced" else "基本的な検索"
         })
 
     # プロンプト設定タブ
@@ -378,6 +401,7 @@ def render_settings(pinecone_service: PineconeService):
             "chunk_size": chunk_size,
             "batch_size": batch_size,
             "top_k": top_k,
-            "similarity_threshold": similarity_threshold
+            "similarity_threshold": similarity_threshold,
+            "search_mode": selected_mode
         })
         st.success("✅ 設定を保存しました。") 

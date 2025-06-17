@@ -138,6 +138,10 @@ def render_chat(pinecone_service: PineconeService):
         # API使用状況の確認
         st.session_state.langchain_service.check_api_usage()
     
+    # 検索モードの設定を反映
+    search_mode = st.session_state.get("search_mode", "advanced")
+    st.session_state.langchain_service.set_search_mode(search_mode == "advanced")
+    
     # プロンプトテンプレートの読み込み（毎回最新の状態を取得）
     prompt_templates, _, _ = load_prompt_templates()
     st.session_state.prompt_templates = prompt_templates
@@ -298,7 +302,17 @@ def render_chat(pinecone_service: PineconeService):
                                     st.write(f"ファイル名: {detail['ファイル名']}")
                                     st.write(f"ページ番号: {detail['ページ番号']}")
                                     st.write(f"セクション: {detail['セクション']}")
-                                    st.write(f"スコア: {detail['スコア']}")
+                                    
+                                    # 高度な検索の結果を表示
+                                    if "スコア" in detail:
+                                        st.write(f"調整されたスコア: {detail['スコア']}")
+                                    if "元のスコア" in detail:
+                                        st.write(f"元のスコア: {detail['元のスコア']}")
+                                    if "クエリバリエーション" in detail:
+                                        st.write(f"使用されたクエリ: {detail['クエリバリエーション']}")
+                                    if "クエリ順序" in detail:
+                                        st.write(f"クエリ順序: {detail['クエリ順序']}")
+                                    
                                     st.text_area(f"テキスト {i}", detail['テキスト'], height=100)
                             
                             st.text_area("物件情報", sent_text["物件情報"], height=100)
