@@ -32,6 +32,12 @@ EMBEDDING_DIMENSION = 3072  # 埋め込みベクトルの次元数
 DEFAULT_TOP_K = 10  # デフォルトの検索結果数
 SIMILARITY_THRESHOLD = 0.5  # 類似度のしきい値（0-1の範囲）
 
+# Hybrid Search Settings
+ENABLE_HYBRID_SEARCH = True  # ハイブリッド検索の有効/無効
+SEMANTIC_WEIGHT = 0.7  # 意味検索の重み（0-1の範囲）
+KEYWORD_WEIGHT = 0.3  # キーワード検索の重み（0-1の範囲）
+ENABLE_QUERY_EXPANSION = True  # クエリ拡張の有効/無効
+
 # Metadata Settings
 DEFAULT_CREATION_DATE = datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # メタデータの作成日が空の場合のデフォルト値
 
@@ -206,4 +212,4 @@ METADATA_CATEGORIES = {
         "川崎市",
         "相模原市",
     ]
-}   
+}      

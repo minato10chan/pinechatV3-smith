@@ -93,6 +93,32 @@ class JapaneseTextProcessor:
         
         return chunks
 
+
+def expand_educational_query(query: str) -> str:
+    """教育関連クエリを拡張して検索精度を向上させる"""
+    
+    education_expansions = {
+        "学区": ["学区", "通学区域", "校区", "学校区域"],
+        "小学校": ["小学校", "初等学校", "小学", "elementary"],
+        "中学校": ["中学校", "中学", "junior high", "中等学校"],
+        "教育": ["教育", "学習", "勉強", "授業"],
+        "学校": ["学校", "教育機関", "学園", "校舎"],
+        "通学": ["通学", "登校", "下校", "通学路"]
+    }
+    
+    expanded_terms = []
+    query_lower = query.lower()
+    
+    expanded_terms.append(query)
+    
+    for base_term, expansions in education_expansions.items():
+        if base_term in query_lower:
+            for expansion in expansions:
+                if expansion not in query_lower:
+                    expanded_terms.append(expansion)
+    
+    return " ".join(expanded_terms)
+
 # 後方互換性のための関数
 def process_text_file(file_content: str, filename: str, chunk_size: int = CHUNK_SIZE) -> List[Dict[str, Any]]:
     processor = JapaneseTextProcessor()

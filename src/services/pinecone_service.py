@@ -197,8 +197,35 @@ class PineconeService:
         except Exception as e:
             raise Exception(f"チャンクのアップロードに失敗しました: {str(e)}")
 
-    def query(self, query_text: str, namespace: str = None, top_k: int = DEFAULT_TOP_K, similarity_threshold: float = SIMILARITY_THRESHOLD) -> Dict[str, Any]:
-        """クエリに基づいて類似チャンクを検索"""
+    def calculate_keyword_score(self, query_text: str, document_text: str, metadata: dict) -> float:
+        """キーワードマッチングスコアを計算"""
+        query_keywords = set(query_text.lower().split())
+        doc_keywords = set(document_text.lower().split())
+        
+        metadata_text = ""
+        for key, value in metadata.items():
+            if isinstance(value, str) and value:
+                metadata_text += f" {value}"
+        metadata_keywords = set(metadata_text.lower().split())
+        
+        all_doc_keywords = doc_keywords.union(metadata_keywords)
+        
+        matched_keywords = query_keywords.intersection(all_doc_keywords)
+        
+        if not query_keywords:
+            return 0.0
+        
+        keyword_score = len(matched_keywords) / len(query_keywords.union(all_doc_keywords))
+        
+        education_keywords = {"学区", "小学校", "中学校", "教育", "学校", "通学", "校区"}
+        education_matches = query_keywords.intersection(education_keywords)
+        if education_matches and any(edu_key in all_doc_keywords for edu_key in education_keywords):
+            keyword_score *= 1.5  # 教育関連マッチにボーナス
+        
+        return min(keyword_score, 1.0)  # 最大値を1.0に制限
+
+    def query(self, query_text: str, namespace: str = None, top_k: int = DEFAULT_TOP_K, similarity_threshold: float = SIMILARITY_THRESHOLD, enable_hybrid: bool = True) -> Dict[str, Any]:
+        """クエリに基づいて類似チャンクを検索（ハイブリッド検索対応）"""
         max_retries = 3
         retry_delay = 1
         
@@ -209,18 +236,43 @@ class PineconeService:
                 print(f"検索クエリ: {query_text}")
                 print(f"類似度しきい値: {similarity_threshold}")
                 print(f"取得する候補数: {top_k}")
+                print(f"ハイブリッド検索: {'有効' if enable_hybrid else '無効'}")
                 
-                # 検索を実行
+                search_top_k = top_k * 2 if enable_hybrid else top_k
                 results = self.index.query(
                     vector=query_vector,
-                    top_k=top_k,  # 必要な数だけ取得
+                    top_k=search_top_k,
                     include_metadata=True,
-                    namespace=namespace  # namespaceを指定
+                    namespace=namespace
                 )
                 
                 print(f"取得した候補数: {len(results.matches)}")
+                
+                if enable_hybrid and results.matches:
+                    from ..config.settings import SEMANTIC_WEIGHT, KEYWORD_WEIGHT
+                    
+                    print("ハイブリッドスコアを計算中...")
+                    for match in results.matches:
+                        semantic_score = match.score
+                        
+                        keyword_score = self.calculate_keyword_score(
+                            query_text, 
+                            match.metadata.get('text', ''), 
+                            match.metadata
+                        )
+                        
+                        hybrid_score = (semantic_score * SEMANTIC_WEIGHT) + (keyword_score * KEYWORD_WEIGHT)
+                        
+                        match.score = hybrid_score
+                        
+                        print(f"意味: {semantic_score:.3f}, キーワード: {keyword_score:.3f}, ハイブリッド: {hybrid_score:.3f}")
+                    
+                    results.matches.sort(key=lambda x: x.score, reverse=True)
+                    
+                    results.matches = results.matches[:top_k]
+                
                 if results.matches:
-                    print("候補のスコア:")
+                    print("最終候補のスコア:")
                     for match in results.matches:
                         print(f"スコア: {match.score:.3f}")
                 
@@ -411,4 +463,4 @@ class PineconeService:
             }
         except Exception as e:
             print(f"ベクトルの取得中にエラーが発生しました: {str(e)}")
-            return None 
+            return None  

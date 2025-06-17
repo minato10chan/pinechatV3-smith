@@ -81,11 +81,52 @@ def render_settings(pinecone_service: PineconeService):
                 help="検索結果の類似度のしきい値。高いほど厳密な検索になります。"
             )
         
+        st.markdown("### 🔍 ハイブリッド検索設定")
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            enable_hybrid_search = st.checkbox(
+                "ハイブリッド検索を有効にする",
+                value=st.session_state.get("enable_hybrid_search", True),
+                help="意味検索とキーワード検索を組み合わせて検索精度を向上させます。"
+            )
+            
+            enable_query_expansion = st.checkbox(
+                "クエリ拡張を有効にする",
+                value=st.session_state.get("enable_query_expansion", True),
+                help="教育関連クエリを自動的に拡張して検索精度を向上させます。"
+            )
+        
+        with col4:
+            semantic_weight = st.slider(
+                "意味検索の重み",
+                min_value=0.0,
+                max_value=1.0,
+                value=st.session_state.get("semantic_weight", 0.7),
+                step=0.1,
+                help="ハイブリッド検索における意味検索の重み。",
+                disabled=not enable_hybrid_search
+            )
+            
+            keyword_weight = st.slider(
+                "キーワード検索の重み",
+                min_value=0.0,
+                max_value=1.0,
+                value=1.0 - semantic_weight,
+                step=0.1,
+                help="ハイブリッド検索におけるキーワード検索の重み。",
+                disabled=True  # 自動計算されるため無効
+            )
+        
         st.markdown("---")
         st.markdown("### 現在の設定値")
         st.json({
             "検索結果数": top_k,
-            "類似度しきい値": similarity_threshold
+            "類似度しきい値": similarity_threshold,
+            "ハイブリッド検索": enable_hybrid_search,
+            "クエリ拡張": enable_query_expansion,
+            "意味検索重み": semantic_weight,
+            "キーワード検索重み": keyword_weight
         })
 
     # プロンプト設定タブ
@@ -378,6 +419,17 @@ def render_settings(pinecone_service: PineconeService):
             "chunk_size": chunk_size,
             "batch_size": batch_size,
             "top_k": top_k,
-            "similarity_threshold": similarity_threshold
+            "similarity_threshold": similarity_threshold,
+            "enable_hybrid_search": enable_hybrid_search,
+            "enable_query_expansion": enable_query_expansion,
+            "semantic_weight": semantic_weight,
+            "keyword_weight": keyword_weight
         })
-        st.success("✅ 設定を保存しました。") 
+        
+        from ..config.settings import SEMANTIC_WEIGHT, KEYWORD_WEIGHT
+        import importlib
+        settings_module = importlib.import_module('src.config.settings')
+        settings_module.SEMANTIC_WEIGHT = semantic_weight
+        settings_module.KEYWORD_WEIGHT = keyword_weight
+        
+        st.success("✅ 設定を保存しました。")     

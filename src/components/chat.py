@@ -346,7 +346,9 @@ def render_chat(pinecone_service: PineconeService):
                 response_template=selected_template_data["response_template"],
                 property_info=st.session_state.get("property_info", "物件情報はありません。"),
                 chat_history=chat_history,
-                similarity_threshold=st.session_state.get("similarity_threshold", 0.7)
+                similarity_threshold=st.session_state.get("similarity_threshold", 0.7),
+                enable_hybrid=st.session_state.get("enable_hybrid_search", True),
+                enable_expansion=st.session_state.get("enable_query_expansion", True)
             )
             
             # アシスタントの応答を追加
@@ -357,4 +359,4 @@ def render_chat(pinecone_service: PineconeService):
                 "timestamp": datetime.now().isoformat()
             })
         
-        st.rerun() 
+        st.rerun()  

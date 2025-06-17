@@ -14,8 +14,12 @@ from ..config.settings import (
     DEFAULT_TOP_K,
     SIMILARITY_THRESHOLD,
     DEFAULT_SYSTEM_PROMPT,
-    DEFAULT_RESPONSE_TEMPLATE
+    DEFAULT_RESPONSE_TEMPLATE,
+    ENABLE_HYBRID_SEARCH,
+    ENABLE_QUERY_EXPANSION
 )
+from .pinecone_service import PineconeService
+from ..utils.text_processing import expand_educational_query
 
 class LangChainService:
     def __init__(self, callback_manager=None):
@@ -52,6 +56,9 @@ class LangChainService:
         
         # チャット履歴の初期化
         self.message_history = ChatMessageHistory()
+        
+        # PineconeServiceの初期化（ハイブリッド検索用）
+        self.pinecone_service = PineconeService()
         
         # デフォルトのプロンプトテンプレート
         self.system_prompt = DEFAULT_SYSTEM_PROMPT
@@ -101,43 +108,72 @@ class LangChainService:
         """テキストのトークン数をカウント"""
         return len(self.encoding.encode(text))
 
-    def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K, similarity_threshold: float = SIMILARITY_THRESHOLD) -> Tuple[str, List[Dict[str, Any]], int]:
-        """クエリに関連する文脈を取得"""
+    def get_relevant_context(self, query: str, top_k: int = DEFAULT_TOP_K, similarity_threshold: float = SIMILARITY_THRESHOLD, enable_hybrid: bool = None, enable_expansion: bool = None) -> Tuple[str, List[Dict[str, Any]], int]:
+        """クエリに関連する文脈を取得（ハイブリッド検索・クエリ拡張対応）"""
         try:
-            # クエリのトークン数をカウント
+            if enable_hybrid is None:
+                enable_hybrid = ENABLE_HYBRID_SEARCH
+            if enable_expansion is None:
+                enable_expansion = ENABLE_QUERY_EXPANSION
+            
             query_tokens = self.count_tokens(query)
             print(f"クエリのトークン数: {query_tokens}")
             
-            # クエリのベクトル化
-            query_vector = self.embeddings.embed_query(query)
+            original_query = query
+            if enable_expansion:
+                expanded_query = expand_educational_query(query)
+                print(f"元のクエリ: {original_query}")
+                print(f"拡張クエリ: {expanded_query}")
+                query = expanded_query
             
-            # 検索を実行
-            docs = self.vectorstore.similarity_search_with_score(query, k=top_k)
-            
-            # メタデータを簡略化して保持
-            simplified_docs = []
-            for doc in docs:
-                # メタデータを簡略化
-                simplified_metadata = {}
-                for key, value in doc[0].metadata.items():
-                    if isinstance(value, str):
-                        # メタデータの値を短くする（最大100文字）
-                        simplified_metadata[key] = value[:100] + "..." if len(value) > 100 else value
+            if enable_hybrid:
+                search_results = self.pinecone_service.query(
+                    query_text=query,
+                    top_k=top_k,
+                    similarity_threshold=similarity_threshold,
+                    enable_hybrid=True
+                )
                 
-                # テキストを短くする（最大500文字）
-                content = doc[0].page_content
-                if len(content) > 500:
-                    content = content[:500] + "..."
+                simplified_docs = []
+                for match in search_results.get('matches', []):
+                    simplified_metadata = {}
+                    metadata = match.metadata or {}
+                    
+                    for key, value in metadata.items():
+                        if isinstance(value, str):
+                            simplified_metadata[key] = value[:100] + "..." if len(value) > 100 else value
+                    
+                    content = metadata.get('text', '')
+                    if len(content) > 500:
+                        content = content[:500] + "..."
+                    
+                    simplified_doc = {
+                        "content": content,
+                        "metadata": simplified_metadata,
+                        "score": match.score
+                    }
+                    simplified_docs.append(simplified_doc)
+            else:
+                docs = self.vectorstore.similarity_search_with_score(query, k=top_k)
                 
-                # 簡略化したドキュメントを作成
-                simplified_doc = {
-                    "content": content,
-                    "metadata": simplified_metadata,
-                    "score": doc[1]
-                }
-                simplified_docs.append(simplified_doc)
+                simplified_docs = []
+                for doc in docs:
+                    simplified_metadata = {}
+                    for key, value in doc[0].metadata.items():
+                        if isinstance(value, str):
+                            simplified_metadata[key] = value[:100] + "..." if len(value) > 100 else value
+                    
+                    content = doc[0].page_content
+                    if len(content) > 500:
+                        content = content[:500] + "..."
+                    
+                    simplified_doc = {
+                        "content": content,
+                        "metadata": simplified_metadata,
+                        "score": doc[1]
+                    }
+                    simplified_docs.append(simplified_doc)
             
-            # スコアでフィルタリング（しきい値未満は除外）
             filtered_docs = [
                 doc for doc in simplified_docs
                 if doc["score"] >= similarity_threshold
@@ -151,10 +187,8 @@ class LangChainService:
             else:
                 print("しきい値以上の候補が見つかりませんでした。")
             
-            # コンテキストテキストを作成（メタデータを含めない）
             context_text = "\n".join([doc["content"] for doc in filtered_docs])
             
-            # コンテキストのトークン数をカウント
             context_tokens = self.count_tokens(context_text)
             print(f"コンテキストのトークン数: {context_tokens}")
             
@@ -166,7 +200,9 @@ class LangChainService:
                     "メタデータ": doc["metadata"],
                     "ファイル名": doc["metadata"].get("source", "不明"),
                     "ページ番号": doc["metadata"].get("page", "不明"),
-                    "セクション": doc["metadata"].get("section", "不明")
+                    "セクション": doc["metadata"].get("section", "不明"),
+                    "検索方式": "ハイブリッド" if enable_hybrid else "意味検索のみ",
+                    "クエリ拡張": "有効" if enable_expansion else "無効"
                 }
                 search_details.append(detail)
             
@@ -189,10 +225,10 @@ class LangChainService:
                 return "", [{
                     "エラー": True,
                     "エラーメッセージ": error_message,
-                    "エラータイプ": "Unknown Error"
+                    "エラータイプ": "Search Error"
                 }], 0
 
-    def get_response(self, query: str, system_prompt: str = None, response_template: str = None, property_info: str = None, chat_history: list = None, similarity_threshold: float = SIMILARITY_THRESHOLD) -> Tuple[str, Dict[str, Any]]:
+    def get_response(self, query: str, system_prompt: str = None, response_template: str = None, property_info: str = None, chat_history: list = None, similarity_threshold: float = SIMILARITY_THRESHOLD, enable_hybrid: bool = None, enable_expansion: bool = None) -> Tuple[str, Dict[str, Any]]:
         """クエリに対する応答を生成"""
         try:
             # プロンプトの設定
@@ -219,8 +255,13 @@ class LangChainService:
             # チェーンの初期化
             chain = prompt | self.llm
             
-            # 関連する文脈を取得
-            context, search_details, context_tokens = self.get_relevant_context(query, similarity_threshold=similarity_threshold)
+            # 関連する文脈を取得（ハイブリッド検索・クエリ拡張対応）
+            context, search_details, context_tokens = self.get_relevant_context(
+                query, 
+                similarity_threshold=similarity_threshold,
+                enable_hybrid=enable_hybrid,
+                enable_expansion=enable_expansion
+            )
             
             # チャット履歴を設定
             if chat_history:
@@ -382,4 +423,4 @@ class LangChainService:
 
     def clear_memory(self):
         """会話メモリをクリア"""
-        self.message_history.clear() 
+        self.message_history.clear()  
