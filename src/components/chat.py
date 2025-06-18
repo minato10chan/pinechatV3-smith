@@ -152,14 +152,7 @@ def render_chat(pinecone_service: PineconeService):
         
         # 会話履歴の最適化状態を表示
         if "langchain_service" in st.session_state:
-            history_tokens = sum(st.session_state.langchain_service.count_tokens(msg.content) 
-                               for msg in st.session_state.langchain_service.message_history.messages)
-            max_tokens = 20000 # LangChainServiceのoptimize_chat_historyと同じ値
-            optimization_status = "最適化済み" if history_tokens <= max_tokens else "最適化が必要"
-            
             st.write(f"会話履歴の状態:")
-            st.write(f"- トークン数: {history_tokens:,} / {max_tokens:,}")
-            st.write(f"- 最適化状態: {optimization_status}")
             st.write(f"- メッセージ数: {len(st.session_state.messages)}")
         
         # プロンプトテンプレートの選択
