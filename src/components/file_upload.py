@@ -169,6 +169,22 @@ def render_file_upload(pinecone_service: PineconeService):
                 placeholder="ソース元を入力してください（任意）"
             )
             
+            # 質問文例の入力
+            st.subheader("質問文例")
+            st.write("このコンテンツに関連する質問文例を入力してください（検索時に優先されます）")
+            
+            # 質問文例の自由入力
+            question_examples = st.text_area(
+                "質問文例",
+                placeholder="このコンテンツに関連する質問文例を入力してください（1行に1つの質問）\n例：\nこの物件の完成時期はいつですか？\n最寄り駅までの距離は？\n周辺の学校について教えてください",
+                help="このコンテンツに関連する質問文例を1行に1つずつ入力してください。入力された質問文例は検索時に優先されます。"
+            )
+            
+            # 質問文例をリストに変換
+            all_question_examples = []
+            if question_examples.strip():
+                all_question_examples = [q.strip() for q in question_examples.split('\n') if q.strip()]
+            
             # アップロード日（自動設定）
             upload_date = datetime.now()
             
@@ -188,7 +204,8 @@ def render_file_upload(pinecone_service: PineconeService):
                                 "city": city if city else "",
                                 "created_date": created_date.isoformat() if created_date else "",
                                 "upload_date": upload_date.isoformat(),
-                                "source": source if source else ""
+                                "source": source if source else "",
+                                "question_examples": all_question_examples
                             }
                             chunk["filename"] = uploaded_file.name
                             chunk["chunk_id"] = chunk["id"]

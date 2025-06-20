@@ -228,7 +228,11 @@ class AdvancedSearchService:
         for result in unique_results.values():
             # クエリバリエーションの順序を考慮したスコア調整
             query_penalty = result.query_index * 0.05  # 後半のクエリは少しペナルティ
-            adjusted_score = result.score - query_penalty
+            
+            # 質問文例との類似度を考慮したスコア調整
+            question_examples_boost = self._calculate_question_examples_boost(result)
+            
+            adjusted_score = result.score - query_penalty + question_examples_boost
             
             # 調整されたスコアを追加
             result.adjusted_score = adjusted_score
@@ -245,6 +249,55 @@ class AdvancedSearchService:
         ]
         
         return filtered_results
+    
+    def _calculate_question_examples_boost(self, result) -> float:
+        """質問文例との類似度を計算してスコアブーストを返す"""
+        question_examples = result.metadata.get("question_examples", [])
+        if not question_examples:
+            return 0.0
+        
+        # 元のクエリを取得（最初のクエリバリエーションを使用）
+        original_query = getattr(result, 'query_variation', '')
+        if not original_query:
+            return 0.0
+        
+        # 質問文例との類似度を計算
+        max_similarity = 0.0
+        for question in question_examples:
+            try:
+                # 簡単な類似度計算（キーワードマッチング）
+                similarity = self._calculate_text_similarity(original_query, question)
+                max_similarity = max(max_similarity, similarity)
+            except Exception as e:
+                print(f"質問文例類似度計算エラー: {str(e)}")
+                continue
+        
+        # 類似度に基づいてブースト値を計算（最大0.3のブースト）
+        boost = max_similarity * 0.3
+        
+        # デバッグ情報
+        if boost > 0.0:
+            print(f"質問文例ブースト: {boost:.3f} (類似度: {max_similarity:.3f})")
+        
+        return boost
+    
+    def _calculate_text_similarity(self, query: str, question: str) -> float:
+        """テキスト間の類似度を計算（簡易版）"""
+        # キーワード抽出
+        query_keywords = set(self._extract_basic_keywords(query))
+        question_keywords = set(self._extract_basic_keywords(question))
+        
+        if not query_keywords or not question_keywords:
+            return 0.0
+        
+        # Jaccard類似度を計算
+        intersection = len(query_keywords.intersection(question_keywords))
+        union = len(query_keywords.union(question_keywords))
+        
+        if union == 0:
+            return 0.0
+        
+        return intersection / union
     
     def get_search_analytics(self, search_results: Dict[str, Any]) -> Dict[str, Any]:
         """検索分析情報を取得"""

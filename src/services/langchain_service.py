@@ -172,7 +172,8 @@ class LangChainService:
                 "ページ番号": match.metadata.get("page", "不明"),
                 "セクション": match.metadata.get("section", "不明"),
                 "クエリバリエーション": getattr(match, 'query_variation', 'unknown'),
-                "クエリ順序": getattr(match, 'query_index', 0)
+                "クエリ順序": getattr(match, 'query_index', 0),
+                "質問文例": match.metadata.get("question_examples", [])
             }
             search_details.append(detail)
         
@@ -257,7 +258,8 @@ class LangChainService:
                 "メタデータ": doc["metadata"],
                 "ファイル名": doc["metadata"].get("source", "不明"),
                 "ページ番号": doc["metadata"].get("page", "不明"),
-                "セクション": doc["metadata"].get("section", "不明")
+                "セクション": doc["metadata"].get("section", "不明"),
+                "質問文例": doc["metadata"].get("question_examples", [])
             }
             search_details.append(detail)
         

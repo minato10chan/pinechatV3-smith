@@ -306,6 +306,12 @@ def render_chat(pinecone_service: PineconeService):
                                     if "クエリ順序" in detail:
                                         st.write(f"クエリ順序: {detail['クエリ順序']}")
                                     
+                                    # 質問文例の表示
+                                    if "質問文例" in detail and detail["質問文例"]:
+                                        st.write("**質問文例:**")
+                                        for i, question in enumerate(detail["質問文例"], 1):
+                                            st.write(f"{i}. {question}")
+                                    
                                     st.text_area(f"テキスト {i}", detail['テキスト'], height=100)
                             
                             st.text_area("物件情報", sent_text["物件情報"], height=100)
