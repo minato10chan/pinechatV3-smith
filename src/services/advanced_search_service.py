@@ -109,34 +109,6 @@ class AdvancedSearchService:
         
         return variations
     
-    def filter_by_metadata(self, query: str, keywords: List[str]) -> Dict[str, Any]:
-        """メタデータに基づいて検索範囲を絞り込み"""
-        filters = {}
-        
-        # カテゴリフィルタリング
-        category_keywords = {
-            "教育・子育て": ["小学校", "中学校", "高校", "大学", "学校", "保育園", "幼稚園", "学童"],
-            "医療・健康": ["病院", "クリニック", "診療所", "歯科", "小児科"],
-            "交通・アクセス": ["駅", "バス停", "交通", "アクセス"],
-            "生活利便性": ["スーパー", "コンビニ", "ショッピング", "銀行", "郵便局"],
-            "安全・防災": ["交番", "消防署", "避難所", "防災"],
-            "地域特性": ["公園", "遊び場", "施設", "地域", "エリア"]
-        }
-        
-        for category, category_keywords_list in category_keywords.items():
-            if any(keyword in keywords for keyword in category_keywords_list):
-                filters["main_category"] = category
-                break
-        
-        # 地域フィルタリング
-        region_keywords = ["川越", "さいたま", "埼玉", "東京", "神奈川", "千葉"]
-        for keyword in keywords:
-            if keyword in region_keywords:
-                filters["city"] = keyword
-                break
-        
-        return filters
-    
     def multi_step_search(self, query: str, namespace: str = None) -> Dict[str, Any]:
         """マルチステップ検索を実行"""
         print(f"\n=== マルチステップ検索開始 ===")
@@ -152,13 +124,8 @@ class AdvancedSearchService:
         query_variations = self.generate_query_variations(query, keywords)
         print(f"生成されたクエリバリエーション: {query_variations}")
         
-        # ステップ3: メタデータフィルタリング
-        print("\nステップ3: メタデータフィルタリング")
-        metadata_filters = self.filter_by_metadata(query, keywords)
-        print(f"メタデータフィルター: {metadata_filters}")
-        
-        # ステップ4: 複数クエリでの検索
-        print("\nステップ4: 複数クエリでの検索")
+        # ステップ3: 複数クエリでの検索
+        print("\nステップ3: 複数クエリでの検索")
         all_results = []
         
         for i, variation in enumerate(query_variations):
@@ -189,8 +156,8 @@ class AdvancedSearchService:
                 print(f"  検索エラー: {str(e)}")
                 continue
         
-        # ステップ5: 結果の統合とランキング
-        print("\nステップ5: 結果の統合とランキング")
+        # ステップ4: 結果の統合とランキング
+        print("\nステップ4: 結果の統合とランキング")
         final_results = self._merge_and_rank_results(all_results, query_variations)
         
         print(f"\n=== 検索完了 ===")
@@ -200,7 +167,6 @@ class AdvancedSearchService:
             "matches": final_results,
             "total_variations": len(query_variations),
             "keywords": keywords,
-            "metadata_filters": metadata_filters,
             "search_details": {
                 "query_variations": query_variations,
                 "original_query": query
@@ -229,10 +195,7 @@ class AdvancedSearchService:
             # クエリバリエーションの順序を考慮したスコア調整
             query_penalty = result.query_index * 0.05  # 後半のクエリは少しペナルティ
             
-            # 質問文例との類似度を考慮したスコア調整
-            question_examples_boost = self._calculate_question_examples_boost(result)
-            
-            adjusted_score = result.score - query_penalty + question_examples_boost
+            adjusted_score = result.score - query_penalty
             
             # 調整されたスコアを追加
             result.adjusted_score = adjusted_score
@@ -250,55 +213,6 @@ class AdvancedSearchService:
         
         return filtered_results
     
-    def _calculate_question_examples_boost(self, result) -> float:
-        """質問文例との類似度を計算してスコアブーストを返す"""
-        question_examples = result.metadata.get("question_examples", [])
-        if not question_examples:
-            return 0.0
-        
-        # 元のクエリを取得（最初のクエリバリエーションを使用）
-        original_query = getattr(result, 'query_variation', '')
-        if not original_query:
-            return 0.0
-        
-        # 質問文例との類似度を計算
-        max_similarity = 0.0
-        for question in question_examples:
-            try:
-                # 簡単な類似度計算（キーワードマッチング）
-                similarity = self._calculate_text_similarity(original_query, question)
-                max_similarity = max(max_similarity, similarity)
-            except Exception as e:
-                print(f"質問文例類似度計算エラー: {str(e)}")
-                continue
-        
-        # 類似度に基づいてブースト値を計算（最大0.3のブースト）
-        boost = max_similarity * 0.3
-        
-        # デバッグ情報
-        if boost > 0.0:
-            print(f"質問文例ブースト: {boost:.3f} (類似度: {max_similarity:.3f})")
-        
-        return boost
-    
-    def _calculate_text_similarity(self, query: str, question: str) -> float:
-        """テキスト間の類似度を計算（簡易版）"""
-        # キーワード抽出
-        query_keywords = set(self._extract_basic_keywords(query))
-        question_keywords = set(self._extract_basic_keywords(question))
-        
-        if not query_keywords or not question_keywords:
-            return 0.0
-        
-        # Jaccard類似度を計算
-        intersection = len(query_keywords.intersection(question_keywords))
-        union = len(query_keywords.union(question_keywords))
-        
-        if union == 0:
-            return 0.0
-        
-        return intersection / union
-    
     def get_search_analytics(self, search_results: Dict[str, Any]) -> Dict[str, Any]:
         """検索分析情報を取得"""
         matches = search_results.get("matches", [])
@@ -308,7 +222,6 @@ class AdvancedSearchService:
                 "total_results": 0,
                 "average_score": 0,
                 "score_distribution": {},
-                "category_distribution": {},
                 "query_effectiveness": {}
             }
         
@@ -323,12 +236,6 @@ class AdvancedSearchService:
             "0.4-0.6": len([s for s in scores if 0.4 <= s < 0.6]),
             "0.4未満": len([s for s in scores if s < 0.4])
         }
-        
-        # カテゴリ分布
-        category_distribution = {}
-        for match in matches:
-            category = match.metadata.get("main_category", "未分類")
-            category_distribution[category] = category_distribution.get(category, 0) + 1
         
         # クエリ効果分析
         query_effectiveness = {}
@@ -353,6 +260,5 @@ class AdvancedSearchService:
             "total_results": len(matches),
             "average_score": round(average_score, 4),
             "score_distribution": score_distribution,
-            "category_distribution": category_distribution,
             "query_effectiveness": query_effectiveness
         } 
